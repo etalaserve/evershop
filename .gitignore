@@ -47,6 +47,8 @@ extensions
 .impeccable
 PRODUCT.md
 /storefront
+packages/evershop/src/storefront/build
+packages/evershop/src/storefront/.react-router
 stress-report-*
 jmeter.log
 stress_test.py

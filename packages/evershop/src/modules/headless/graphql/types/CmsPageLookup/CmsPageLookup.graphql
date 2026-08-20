@@ -1,0 +1,8 @@
+# Direct CMS-page-by-slug lookup for headless clients — same rationale as
+# productByUrlKey/categoryByUrlKey. `cmsPage(id:)` takes a numeric id, and
+# `currentCmsPage` is page-context-bound.
+# NOTE: a block `"""..."""` description above `extend type` is invalid SDL
+# (graphql-js only allows descriptions on definitions) — keep this as `#`.
+extend type Query {
+  cmsPageByUrlKey(urlKey: String!): CmsPage
+}

@@ -1,0 +1,7 @@
+# Direct category-by-slug lookup for headless clients — same rationale as
+# `productByUrlKey`. The core `category(id:)` query only accepts a numeric id.
+# NOTE: a block `"""..."""` description above `extend type` is invalid SDL
+# (graphql-js only allows descriptions on definitions) — keep this as `#`.
+extend type Query {
+  categoryByUrlKey(urlKey: String!): Category
+}

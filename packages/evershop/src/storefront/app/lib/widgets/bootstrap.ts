@@ -1,0 +1,67 @@
+import { AnnouncementBar } from '~/components/widgets/AnnouncementBar.js';
+import { Banner } from '~/components/widgets/Banner.js';
+import { BasicMenu } from '~/components/widgets/BasicMenu.js';
+import { BentoGrid } from '~/components/widgets/BentoGrid.js';
+import { BrandStory } from '~/components/widgets/BrandStory.js';
+import { CategoryMosaic } from '~/components/widgets/CategoryMosaic.js';
+import { CollectionProducts } from '~/components/widgets/CollectionProducts.js';
+import { CollectionSpotlight } from '~/components/widgets/CollectionSpotlight.js';
+import { CollectionStack } from '~/components/widgets/CollectionStack.js';
+import { Columns } from '~/components/widgets/Columns.js';
+import { CouponBlock } from '~/components/widgets/CouponBlock.js';
+import { FaqBlock } from '~/components/widgets/FaqBlock.js';
+import { FeaturedBlogs } from '~/components/widgets/FeaturedBlogs.js';
+import { FooterMenu } from '~/components/widgets/FooterMenu.js';
+import { ProductHero } from '~/components/widgets/ProductHero.js';
+import { RecommendationShelf } from '~/components/widgets/RecommendationShelf.js';
+import { Section } from '~/components/widgets/Section.js';
+import { Separator } from '~/components/widgets/Separator.js';
+import { SimpleSlider } from '~/components/widgets/SimpleSlider.js';
+import { SplitFeature } from '~/components/widgets/SplitFeature.js';
+import { TextBlock } from '~/components/widgets/TextBlock.js';
+import { TieredCategories } from '~/components/widgets/TieredCategories.js';
+import { TrustStrip } from '~/components/widgets/TrustStrip.js';
+
+import { registerStorefrontWidget } from './registry.js';
+
+/**
+ * Side-effect registration, mirroring the legacy modules' `bootstrap.ts`
+ * `registerWidget()` calls. Imported once from `root.tsx` so every route
+ * gets the same registry regardless of which page renders first.
+ *
+ * All 23 legacy `cms`/`catalog`/`blog` widget types are now registered.
+ * The 9 recommendation widgets (`related_products` through
+ * `featured_blogs`) are the exception to every other type here: their
+ * content isn't fully described by `rawSettings` alone — they resolve
+ * live product/collection/post data server-side. That resolution happens
+ * in each page's loader (`resolveWidgetExtras`/`mergeProductAnchorExtras`
+ * in `lib/widgets/resolveWidgetExtras.ts`), keyed by widget uuid and
+ * threaded down through `WidgetArea` as the `extra` prop — see
+ * `WidgetComponentProps` in `registry.tsx`.
+ */
+registerStorefrontWidget('columns', Columns);
+registerStorefrontWidget('section', Section);
+registerStorefrontWidget('separator', Separator);
+registerStorefrontWidget('text_block', TextBlock);
+registerStorefrontWidget('trust_strip', TrustStrip);
+registerStorefrontWidget('faq_block', FaqBlock);
+registerStorefrontWidget('banner', Banner);
+registerStorefrontWidget('simple_slider', SimpleSlider);
+registerStorefrontWidget('basic_menu', BasicMenu);
+registerStorefrontWidget('footer_menu', FooterMenu);
+registerStorefrontWidget('announcement_bar', AnnouncementBar);
+registerStorefrontWidget('coupon_block', CouponBlock);
+registerStorefrontWidget('brand_story', BrandStory);
+registerStorefrontWidget('split_feature', SplitFeature);
+registerStorefrontWidget('category_mosaic', CategoryMosaic);
+registerStorefrontWidget('tiered_categories', TieredCategories);
+registerStorefrontWidget('bento_grid', BentoGrid);
+registerStorefrontWidget('related_products', RecommendationShelf);
+registerStorefrontWidget('frequently_bought_together', RecommendationShelf);
+registerStorefrontWidget('upsell_products', RecommendationShelf);
+registerStorefrontWidget('cart_frequently_bought_together', RecommendationShelf);
+registerStorefrontWidget('collection_products', CollectionProducts);
+registerStorefrontWidget('collection_stack', CollectionStack);
+registerStorefrontWidget('collection_spotlight', CollectionSpotlight);
+registerStorefrontWidget('product_hero', ProductHero);
+registerStorefrontWidget('featured_blogs', FeaturedBlogs);

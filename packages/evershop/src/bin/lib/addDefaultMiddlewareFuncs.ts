@@ -11,6 +11,7 @@ import {
 } from '../../lib/locale/localeResolution.js';
 import { translate } from '../../lib/locale/translate/translate.js';
 import { debug, warning } from '../../lib/log/logger.js';
+import { cors } from '../../lib/middlewares/cors.js';
 import publicStatic from '../../lib/middlewares/publicStatic.js';
 import themePublicStatic from '../../lib/middlewares/themePublicStatic.js';
 import { pool } from '../../lib/postgres/connection.js';
@@ -52,6 +53,9 @@ export function addDefaultMiddlewareFuncs(app) {
       debug(message);
     });
   });
+  // CORS — must run before routing so an OPTIONS preflight (no route
+  // declares that method) still gets a clean response instead of a 404.
+  app.use(cors);
   // Add public static middleware
   app.use(publicStatic);
   // Add theme public static middleware
@@ -223,7 +227,19 @@ export function addDefaultMiddlewareFuncs(app) {
     if (currentRoute?.isApi) {
       // We don't need session for api routes. Restful api should be stateless
       next();
-    } else if (currentRoute?.isAdmin) {
+      return;
+    }
+    // Admin/storefront selection used to key off currentRoute.isAdmin alone,
+    // which only exists when Router.js's legacy pages/admin|frontStore
+    // registry still has a matching route. The in-process React Router v7
+    // app (admin and storefront routes both, see createStorefrontMiddleware.ts)
+    // is cut over path-by-path and its routes are never in that registry, so
+    // currentRoute is undefined for them — falling through to "else" here
+    // used to silently give a migrated ADMIN path the frontStore (`sid`)
+    // session instead of the admin (`asid`) one once its legacy
+    // pages/admin/<route> folder was deleted. A path-prefix check is
+    // resilient to that deletion by construction, for both trees.
+    if (currentRoute?.isAdmin || request.path === '/admin' || request.path.startsWith('/admin/')) {
       adminSessionMiddleware(request, response, next);
     } else {
       frontStoreSessionMiddleware(request, response, next);

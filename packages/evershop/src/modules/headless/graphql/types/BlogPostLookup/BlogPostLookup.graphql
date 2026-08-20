@@ -1,0 +1,8 @@
+# Direct blog-post-by-slug lookup for headless clients — same rationale as
+# productByUrlKey/categoryByUrlKey. `blogPost(id:)` takes a uuid, not a slug,
+# and `currentBlogPost` is page-context-bound.
+# NOTE: a block `"""..."""` description above `extend type` is invalid SDL
+# (graphql-js only allows descriptions on definitions) — keep this as `#`.
+extend type Query {
+  blogPostByUrlKey(urlKey: String!): BlogPost
+}

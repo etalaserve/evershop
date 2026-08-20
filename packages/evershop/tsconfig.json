@@ -24,5 +24,6 @@
       "@evershop/evershop/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/storefront"]
 }

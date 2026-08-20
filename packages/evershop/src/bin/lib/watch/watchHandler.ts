@@ -59,6 +59,15 @@ export async function watchHandler(events: Event[], app: Application) {
     if (isDist(event.path)) {
       continue;
     }
+    // The in-process storefront (Vite + React Router) isn't part of the
+    // SWC-compiled dist tree (see .swcrc's --ignore) and runs its own
+    // independent dev-server watch/HMR — without this, Vite writing its
+    // generated-route-types cache into src/storefront/.react-router/ gets
+    // mistaken for a source change and mirror-"compiled" into a
+    // dist/storefront that's never created, throwing on every boot.
+    if (event.path.toString().includes(`${path.sep}storefront${path.sep}`)) {
+      continue;
+    }
     if (isSrc(event.path)) {
       const distPath = event.path
         .toString()

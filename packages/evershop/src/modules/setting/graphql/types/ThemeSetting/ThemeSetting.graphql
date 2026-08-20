@@ -1,0 +1,10 @@
+# Storefront design tokens (colors, radius, fonts). A single JSON blob stored as
+# one `setting` row (name = "themeTokens", is_json = 1) — the same EAV pattern
+# every other JSON setting (e.g. storeLanguages) already uses, so no migration
+# is needed. Null when the tenant hasn't customized anything yet; consumers
+# (the headless storefront) fall back to their own built-in defaults.
+# NOTE: a block `"""..."""` description above `extend type` is invalid SDL
+# (graphql-js only allows descriptions on definitions) — keep this as `#`.
+extend type Setting {
+  themeTokens: JSON
+}

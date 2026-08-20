@@ -26,7 +26,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const start = async function start(context, cb) {
-  const app = createApp();
+  const app = await createApp();
   /** Create a http server */
   const server = http.createServer(app);
   const modules = [...getCoreModules(), ...getEnabledExtensions()];

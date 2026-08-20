@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import config from 'config';
+import spawn from 'cross-spawn';
 import { CONSTANTS } from '../../lib/helpers.js';
 import { error } from '../../lib/log/logger.js';
 import { loadModuleRoutes } from '../../lib/router/loadModuleRoutes.js';
@@ -65,6 +67,52 @@ export default async function build() {
 
   /** Build  */
   await compile(routes);
+
+  /** Build the in-process storefront (React Router v7 + Vite) */
+  await buildStorefront();
+}
+
+/**
+ * Runs `react-router build` against the storefront's own vite.config.ts,
+ * writing `src/storefront/build/{client,server}`. Separate from the
+ * Webpack `compile()` above — the storefront isn't part of the route-based
+ * Area/Webpack pipeline, it's a standalone Vite project living alongside it
+ * (see createStorefrontMiddleware.ts for how the two are stitched together
+ * at request time).
+ */
+async function buildStorefront() {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  // dist/bin/build -> dist/bin -> dist -> package root
+  const packageRoot = path.resolve(__dirname, '..', '..', '..');
+  const storefrontRoot = path.resolve(packageRoot, 'src', 'storefront');
+
+  // `import.meta.resolve` (not `npx`) to find the CLI entry — in an
+  // npm-workspaces monorepo `@react-router/dev` may be hoisted to the repo
+  // root or kept nested next to this package depending on version
+  // resolution, and `npx` was found to mis-detect the storefront's app
+  // directory when invoked this way (root-detection false negative:
+  // "Could not find a root route module" despite app/root.tsx existing —
+  // reproducible even with a correct `cwd`). Resolving and invoking the bin
+  // script directly with Node sidesteps whatever npx does differently.
+  const devPackageJsonUrl = import.meta.resolve('@react-router/dev/package.json');
+  const devPackageDir = path.dirname(fileURLToPath(devPackageJsonUrl));
+  const cliBin = path.resolve(devPackageDir, 'bin.js');
+
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [cliBin, 'build'], {
+      cwd: storefrontRoot,
+      stdio: 'inherit'
+    });
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Storefront build failed with exit code ${code}`));
+      }
+    });
+    child.on('error', reject);
+  });
 }
 
 process.on('uncaughtException', function (exception) {

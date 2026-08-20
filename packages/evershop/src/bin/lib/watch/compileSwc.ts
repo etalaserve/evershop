@@ -53,7 +53,12 @@ export async function compileSwc(
             '--config-file',
             configFile,
             '--strip-leading-paths',
-            '--copy-files'
+            '--copy-files',
+            // The in-process storefront (Vite + React Router) isn't part of
+            // the SWC-compiled dist tree — same exclusion as the `compile`
+            // npm script in the root package.json.
+            '--ignore',
+            'src/storefront/**'
           ],
           execaOptions
         );

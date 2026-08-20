@@ -20,6 +20,14 @@ export default async function enableWatcher() {
         // floods the watcher and the effects run against half-built paths.
         '**/dist.compiling/**',
         '**/build/**',
+        // The in-process storefront (Vite + React Router) isn't part of the
+        // SWC-compiled dist tree (see .swcrc's --ignore) and has its own
+        // independent dev-server watch/HMR — Vite writes generated route
+        // types into src/storefront/.react-router/ on every boot, which this
+        // watcher would otherwise mistake for a source change and try to
+        // mirror-compile into a dist/storefront that's never created.
+        '**/src/storefront/**',
+
         // Runtime-written directories: the sitemap cron rewrites public/*.xml
         // on schedule and uploads land in media/. Neither needs compilation
         // or a dev-server effect, and an event from them during the boot

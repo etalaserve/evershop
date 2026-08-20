@@ -1,0 +1,10 @@
+# Direct product-by-slug lookup for headless clients. The core `product(id:)`
+# query only accepts a numeric `product_id` (it's meant to be called from
+# EverShop's own SSR page middleware, which already resolved the slug to an id
+# via `currentProductId`); an external client hitting `/graphql` cold has only
+# the URL slug. `urlKey` is the product's own unique `url_key` column.
+# NOTE: a block `"""..."""` description above `extend type` is invalid SDL
+# (graphql-js only allows descriptions on definitions) — keep this as `#`.
+extend type Query {
+  productByUrlKey(urlKey: String!): Product
+}

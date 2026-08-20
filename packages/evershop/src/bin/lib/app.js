@@ -7,9 +7,10 @@ import { getRoutes } from '../../lib/router/Router.js';
 import { getTrustProxyHops } from '../../lib/util/getTrustProxyHops.js';
 import { getEnabledExtensions } from '../extension/index.js';
 import { addDefaultMiddlewareFuncs } from './addDefaultMiddlewareFuncs.js';
+import { attachStorefrontMiddleware } from './createStorefrontMiddleware.js';
 import { getCoreModules } from './loadModules.js';
 
-export const createApp = () => {
+export const createApp = async () => {
   /** Create express app */
   const app = express();
   // Trust proxy — determines request.ip (and thus rate-limit bucketing). The
@@ -48,6 +49,14 @@ export const createApp = () => {
 
   // Adding default middlewares
   addDefaultMiddlewareFuncs(app);
+
+  // In-process Vite/React Router storefront — see createStorefrontMiddleware.ts.
+  // Mounted after session/locale/route-matching (so it can read
+  // request.session, etc) but before the legacy per-route handlers below, so
+  // a migrated path never reaches the old pipeline. Starts matching zero
+  // paths until routes are cut over one by one.
+  await attachStorefrontMiddleware(app);
+
   const routes = getRoutes();
   routes.forEach((route) => {
     // app.all(route.path, Handler.middleware());

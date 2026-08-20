@@ -10,14 +10,21 @@ services:
       DB_PASSWORD: postgres
       DB_USER: postgres
       DB_NAME: postgres
+      REDIS_URL: redis://redis:6379
     networks:
       - myevershop
     depends_on:
       - database
+      - redis
     ports:
       - 3000:3000
-  
-  #The postgres database: 
+    volumes:
+      # Uploaded/processed images (see lib/admin/uploadImage.ts) — local-disk
+      # storage inside the container, persisted across restarts via this
+      # named volume so a container recreate doesn't wipe product images.
+      - media-data:/app/media
+
+  #The postgres database:
   database:
     image: postgres:16
     restart: unless-stopped
@@ -32,6 +39,19 @@ services:
     networks:
       - myevershop
 
+  # Cache-aside layer for `lib/cache/middleware.ts` — GraphQL response
+  # caching (home/category/product pages, shared header/footer chrome).
+  # `getRedis()` degrades gracefully to "no caching" if this is absent, so
+  # it's optional infrastructure, not a hard dependency.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    networks:
+      - myevershop
+
 networks:
   myevershop:
     name: MyEverShop
@@ -39,3 +59,5 @@ networks:
 
 volumes:
   postgres-data:
+  redis-data:
+  media-data:
