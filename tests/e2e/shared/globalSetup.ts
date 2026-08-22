@@ -7,11 +7,16 @@ import {
   createTestAdmin,
   type TestAdmin
 } from './auth.js';
+import { cleanupCoupons, seedCoupon } from './couponDb.js';
+import { seedCustomerAuth, writeAnonStorageState } from './customerAuth.js';
+import { cleanupCustomers } from './customerDb.js';
 import {
   cleanupTestChangesets,
   cleanupTestWidgets,
   closeDb
 } from './db.js';
+import { cleanupLandingPages, seedLandingPage } from './landingPageDb.js';
+import { cleanupOrders, seedOrder } from './orderDb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR = path.join(__dirname, '..', '.auth');
@@ -31,6 +36,13 @@ const ADMIN_META_PATH = path.join(AUTH_DIR, 'admin.meta.json');
  *      session cookie as Playwright `storageState`. Specs reuse it.
  *   5. Persist the admin's id to `admin.meta.json` so globalTeardown can
  *      target the right user.
+ *   6. Write `.auth/anon.json` (always) and, when `E2E_SEED_FIXTURES=1`,
+ *      seed the capture fixtures: customer + session, order, coupon,
+ *      landing page. Those exist purely so the capture suite can visit
+ *      `/order/:uuid`, `/admin/orders/:uuid`, `/admin/customers/:uuid`,
+ *      `/admin/coupons/:uuid` and `/admin/landing-pages/:uuid` with real
+ *      data — `evershop seed --all` creates none of those entities. The
+ *      functional specs don't need them, so they stay behind the flag.
  */
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL =
@@ -38,24 +50,37 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     process.env.BASE_URL ??
     'http://localhost:3000';
 
-  // 1. Reachability probe. 5s budget — anything longer means the dev
-  // server is rebuilding or hung; we'd rather fail now than wait 30s on
-  // each spec's navigation.
-  try {
-    const probe = await request.newContext({ baseURL });
-    const res = await probe.get('/', { timeout: 5000 });
-    if (!res.ok()) {
-      throw new Error(
-        `Dev server at ${baseURL} responded ${res.status()}. Is it ready?`
-      );
+  // 1. Reachability probe. Retries rather than making one 5s attempt: the
+  // dev server rebuilds its webpack bundles in the background and a request
+  // arriving mid-rebuild can take several seconds while the server is
+  // perfectly healthy. A single short attempt turned that into a hard
+  // failure telling you to start a server that was already running.
+  // Still bounded, so a genuinely absent server fails in ~30s rather than
+  // hanging every spec.
+  const READY_BUDGET_MS = Number(process.env.E2E_READY_TIMEOUT_MS ?? 30_000);
+  const deadline = Date.now() + READY_BUDGET_MS;
+  let lastError = '';
+  let ready = false;
+  while (Date.now() < deadline) {
+    try {
+      const probe = await request.newContext({ baseURL });
+      const res = await probe.get('/', { timeout: 10_000 });
+      await probe.dispose();
+      if (res.ok()) {
+        ready = true;
+        break;
+      }
+      lastError = `responded ${res.status()}`;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
     }
-    await probe.dispose();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (!ready) {
     throw new Error(
-      `[e2e:globalSetup] Cannot reach BASE_URL ${baseURL}.\n` +
+      `[e2e:globalSetup] Cannot reach BASE_URL ${baseURL} within ${READY_BUDGET_MS}ms.\n` +
         `  → Start the dev server: \`npm run dev\` from the repo root.\n` +
-        `  → Original error: ${msg}`
+        `  → Last error: ${lastError}`
     );
   }
 
@@ -98,6 +123,27 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     ),
     'utf8'
   );
+
+  // 6. Capture fixtures. `anon.json` is unconditional — it costs a file
+  // write and the capture projects can't start without it.
+  writeAnonStorageState();
+
+  if (process.env.E2E_SEED_FIXTURES === '1') {
+    // Sweep first, for the same reason step 2 does: a run killed mid-flight
+    // leaves rows behind, and the unique indexes on coupon.coupon /
+    // landing_page.url_key / customer.email would otherwise be a slow leak
+    // rather than a hard failure.
+    await cleanupOrders();
+    await cleanupCustomers();
+    await cleanupCoupons();
+    await cleanupLandingPages();
+
+    // Order after customer: the order hangs off the fixture customer.
+    const customer = await seedCustomerAuth(baseURL);
+    await seedOrder(customer);
+    await seedCoupon();
+    await seedLandingPage();
+  }
 
   // Suite-scoped pool. Specs open their own short-lived ones via getDb().
   // Closing here would force each spec to reconnect — keep it open until

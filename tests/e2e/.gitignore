@@ -4,3 +4,8 @@ node_modules/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Capture output: hundreds of PNGs plus a generated contact sheet, all
+# regenerable by re-running the capture projects. Reviewing them is the
+# point; versioning them is not.
+captures/

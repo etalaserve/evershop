@@ -2,12 +2,16 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deleteTestAdmin } from './auth.js';
+import { cleanupCoupons } from './couponDb.js';
+import { cleanupCustomers } from './customerDb.js';
 import {
   cleanupTestChangesets,
   cleanupTestRolloutPlans,
   cleanupTestWidgets,
   closeDb
 } from './db.js';
+import { cleanupLandingPages } from './landingPageDb.js';
+import { cleanupOrders } from './orderDb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR = path.join(__dirname, '..', '.auth');
@@ -22,8 +26,10 @@ const ADMIN_META_PATH = path.join(AUTH_DIR, 'admin.meta.json');
  *   2. Drop any `e2e-*` widgets the suite forgot to clean up inside its
  *      individual spec teardowns.
  *   3. Drop any draft `e2e-*` changesets.
- *   4. Remove the `.auth` directory so the next run starts fresh.
- *   5. Close the pg pool.
+ *   4. Drop the capture fixtures (orders, customers, coupons, landing
+ *      pages) in FK-safe order.
+ *   5. Remove the `.auth` directory so the next run starts fresh.
+ *   6. Close the pg pool.
  */
 export default async function globalTeardown(): Promise<void> {
   const safeRun = async (label: string, fn: () => Promise<void>) => {
@@ -57,6 +63,17 @@ export default async function globalTeardown(): Promise<void> {
   await safeRun('cleanupTestRolloutPlans', cleanupTestRolloutPlans);
   await safeRun('cleanupTestWidgets', cleanupTestWidgets);
   await safeRun('cleanupTestChangesets', cleanupTestChangesets);
+
+  // Capture fixtures. Run unconditionally rather than behind
+  // E2E_SEED_FIXTURES: if the flag was set for the run that crashed and
+  // unset for this one, the rows still need to go. Order is the FK chain —
+  // orders (plus their order_address / cart companions, which have no
+  // cascade) before the customer they point at; coupons and landing pages
+  // are referenced by nothing.
+  await safeRun('cleanupOrders', cleanupOrders);
+  await safeRun('cleanupCustomers', cleanupCustomers);
+  await safeRun('cleanupCoupons', cleanupCoupons);
+  await safeRun('cleanupLandingPages', cleanupLandingPages);
 
   // Wipe stored auth so the next run can't reuse a stale session by
   // accident (it would 401 once the admin is gone, but failing fast at

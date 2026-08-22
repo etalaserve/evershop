@@ -11,6 +11,24 @@ loadEnv({ path: path.join(__dirname, '.env') });
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const WORKERS = Number(process.env.PLAYWRIGHT_WORKERS ?? '1');
 
+const DESKTOP = { width: 1440, height: 900 };
+const VIEWPORTS = {
+  desktop: DESKTOP,
+  tablet: { width: 768, height: 1024 },
+  mobile: { width: 390, height: 844 }
+} as const;
+
+/**
+ * Which storageState each capture project runs under. `anon.json` is an empty
+ * state written by globalSetup — Playwright needs a real file, not `undefined`,
+ * for a project to opt out of the suite-wide admin session in `use` below.
+ */
+const AUTH_FILE = {
+  anon: 'anon.json',
+  customer: 'customer.json',
+  admin: 'admin.json'
+} as const;
+
 /**
  * EverShop end-to-end test config.
  *
@@ -55,9 +73,49 @@ export default defineConfig({
     storageState: path.join(__dirname, '.auth/admin.json')
   },
   projects: [
+    /**
+     * The functional suite (was `chromium`). Renamed to say what it is,
+     * since the capture projects own the `<viewport>-<state>` namespace.
+     * Pinned to the admin session it has always assumed.
+     *
+     * It deliberately does NOT run at the other viewports: tripling its
+     * runtime would buy almost nothing, since these specs assert behaviour
+     * and DB state rather than layout.
+     */
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
-    }
+      name: 'functional',
+      use: { ...devices['Desktop Chrome'], viewport: DESKTOP },
+      testIgnore: ['**/capture/**']
+    },
+
+    /**
+     * The capture matrix: three viewports x three auth states.
+     *
+     * The auth state is a project rather than a per-test fixture because
+     * storageState is applied at context creation — and because a route's
+     * *content* depends on it. `/account` as an anonymous visitor is a
+     * redirect to login, which is a legitimate screen worth capturing, not
+     * a failure.
+     */
+    ...(['desktop', 'tablet', 'mobile'] as const).flatMap((viewport) =>
+      (['anon', 'customer', 'admin'] as const).map((state) => ({
+        name: `${viewport}-${state}`,
+        testDir: path.join(__dirname, 'capture'),
+        // Capturing is slower than asserting: every route is a cold
+        // navigation, and against a dev server each one may compile assets
+        // on demand. The functional suite's 30s is too tight for that.
+        timeout: 90_000,
+        // The suite-wide testMatch is anchored at `**/specs/**`, which the
+        // capture tree does not sit under once testDir moves into it.
+        testMatch: ['**/*.spec.ts'],
+        use: {
+          // A real device profile for mobile, so touch support and the UA
+          // match a phone; hover-only affordances correctly stop existing.
+          ...(viewport === 'mobile' ? devices['Pixel 7'] : devices['Desktop Chrome']),
+          viewport: VIEWPORTS[viewport],
+          storageState: path.join(__dirname, `.auth/${AUTH_FILE[state]}`)
+        }
+      }))
+    )
   ]
 });
