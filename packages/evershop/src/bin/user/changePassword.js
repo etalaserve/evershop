@@ -63,11 +63,31 @@ async function updatePassword() {
       .where('admin_user_id', '=', user.admin_user_id)
       .execute(pool);
     success('Password is updated successfully');
-    process.exit(0);
+    await shutdown(0);
   } catch (e) {
     error(e);
-    process.exit(0);
+    await shutdown(1);
   }
+}
+
+/**
+ * Close the pool and let the log drain before exiting.
+ *
+ * Calling process.exit() straight after success()/error() truncated the
+ * output: the logger writes asynchronously, so the process was gone before
+ * anything reached stdout. That mattered because the exit code carried no
+ * information either — the catch branch also exited 0 — leaving a caller
+ * with no way at all to tell a completed password change from a failed one.
+ * Ending the pool releases the handle keeping the loop alive, so the exit
+ * code below is the honest one.
+ */
+async function shutdown(code) {
+  try {
+    await pool.end();
+  } catch {
+    // Already closed, or never opened; the exit code is what matters here.
+  }
+  process.exit(code);
 }
 
 updatePassword();
