@@ -37,10 +37,24 @@ RUN mkdir -p config themes extensions public media
 
 # compile: TypeScript src -> dist via swc (what `build` and `start` execute).
 # build:   webpack bundles for the storefront and admin.
+#
+# The trailing symlink is not redundant. npm creates a workspace package's bin
+# links during `npm install`, but this package's declared bin
+# (packages/evershop/package.json -> "evershop": "./dist/bin/evershop.js")
+# does not exist yet at that point: dist/ is a gitignored build artifact that
+# `npm run compile` produces on the NEXT line, and .dockerignore keeps any
+# host-built copy out of the context. npm therefore silently skips the link,
+# and the image ends up without node_modules/.bin/evershop even though the
+# compiled target is present and executable.
+#
+# That path is the documented way to invoke the CLI (`evershop user:create`,
+# `theme:active`, ...) and is what anything driving this image over
+# `docker exec` will reach for, so recreate it once dist/ exists.
 RUN npm install \
   && npm run compile \
   && npm run compile:db \
-  && npm run build
+  && npm run build \
+  && ln -sf ../@evershop/evershop/dist/bin/evershop.js node_modules/.bin/evershop
 
 # The server listens on $PORT, defaulting to 3000 (bin/lib/normalizePort.js).
 # The previous EXPOSE 80 matched neither the default nor docker-compose.yml.
