@@ -13,7 +13,17 @@ export const DEFAULT_THEME_TOKENS = {
   foreground: '#171717',
   muted: '#f5f5f5',
   radius: 0.5,
-  fontSans: 'Inter, ui-sans-serif, system-ui, sans-serif'
+  fontSans: 'Inter, ui-sans-serif, system-ui, sans-serif',
+  /**
+   * Raw CSS custom-property declarations pasted from a shadcn theme export
+   * (the body of its `:root {...}`/`.dark {...}` block, not the whole
+   * rule) — the page-builder's Theme sheet writes these. Applied *after*
+   * the named tokens above in `themeTokensToCss()`, so a full paste always
+   * wins over the individual color fields for any token it also sets.
+   * Empty string = no override.
+   */
+  customLightCss: '',
+  customDarkCss: ''
 } as const;
 
 export type ThemeTokens = typeof DEFAULT_THEME_TOKENS;
@@ -23,7 +33,8 @@ export function resolveThemeTokens(remote: Partial<ThemeTokens> | null | undefin
   return { ...DEFAULT_THEME_TOKENS, ...(remote ?? {}) };
 }
 
-const TOKEN_TO_CSS_VAR: Record<keyof ThemeTokens, string> = {
+/** The named (non-raw-CSS) keys — everything in `ThemeTokens` except `customLightCss`/`customDarkCss`. */
+const NAMED_TOKEN_TO_CSS_VAR = {
   primary: '--primary',
   secondary: '--secondary',
   accent: '--accent',
@@ -33,16 +44,37 @@ const TOKEN_TO_CSS_VAR: Record<keyof ThemeTokens, string> = {
   muted: '--muted',
   radius: '--radius',
   fontSans: '--font-sans'
-};
+} as const;
 
-/** Build the `:root { ... }` override block injected by <ThemeStyle>. */
+type NamedTokenKey = keyof typeof NAMED_TOKEN_TO_CSS_VAR;
+
+/** Build the `:root { ... }` / `.dark { ... }` override blocks injected by <ThemeStyle>. */
 export function themeTokensToCss(tokens: ThemeTokens): string {
-  const lines = (Object.keys(tokens) as (keyof ThemeTokens)[]).map((key) => {
-    const cssVar = TOKEN_TO_CSS_VAR[key];
+  const lightLines = (Object.keys(NAMED_TOKEN_TO_CSS_VAR) as NamedTokenKey[]).map((key) => {
+    const cssVar = NAMED_TOKEN_TO_CSS_VAR[key];
     const value = key === 'radius' ? `${tokens[key]}rem` : tokens[key];
     return `  ${cssVar}: ${value};`;
   });
-  return `:root {\n${lines.join('\n')}\n}`;
+  if (tokens.customLightCss) lightLines.push(tokens.customLightCss);
+  const blocks = [`:root {\n${lightLines.join('\n')}\n}`];
+  if (tokens.customDarkCss) blocks.push(`.dark {\n${tokens.customDarkCss}\n}`);
+  return blocks.join('\n');
+}
+
+/**
+ * Extracts the declaration bodies of the first `:root { ... }` and
+ * `.dark { ... }` blocks in a pasted shadcn theme snippet. Scoped
+ * deliberately to flat `--var: value;` declarations only (no nested
+ * at-rules/media queries) — that's exactly the shape every shadcn theme
+ * export actually produces, so a naive brace-matched regex is sufficient.
+ */
+export function parseShadcnThemeCss(raw: string): { light: string; dark: string } {
+  const rootMatch = raw.match(/:root\s*\{([^}]*)\}/);
+  const darkMatch = raw.match(/\.dark\s*\{([^}]*)\}/);
+  return {
+    light: rootMatch ? rootMatch[1].trim() : '',
+    dark: darkMatch ? darkMatch[1].trim() : ''
+  };
 }
 
 /**

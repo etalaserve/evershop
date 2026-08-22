@@ -2,7 +2,7 @@ import http from 'http';
 import axios from 'axios';
 import { app, bootstrap, close } from '../app/app.js';
 import createA from '../app/modules/api/api/createA/index.js';
-import afterIndex from '../app/modules/authcopy/api/createA/[index]afterIndex.js';
+import afterIndex from '../app/modules/authcopy/api/createA/afterIndex.js';
 import createAGlobal from '../app/modules/api/api/global/apiGlobal.js';
 import authApiGlobal from '../app/modules/authcopy/api/global/apiAuthGlobal.js';
 

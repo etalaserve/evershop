@@ -29,10 +29,10 @@ export function CategoryMosaic({ widget }: WidgetComponentProps) {
 
   return (
     <div className="space-y-4">
-      {s.heading && <h2 className="text-lg font-semibold">{s.heading}</h2>}
+      {s.heading && <h2 className="text-lg font-semibold tracking-tight">{s.heading}</h2>}
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
         {tiles.map((tile, i) => {
-          const className = `group relative overflow-hidden rounded-lg bg-muted ${asymmetric && i === 0 ? 'col-span-2 row-span-2' : ''}`;
+          const className = `group relative overflow-hidden rounded-xl bg-muted shadow-sm ${asymmetric && i === 0 ? 'col-span-2 row-span-2' : ''}`;
           const content = (
             <>
               <AspectRatio ratio={ratio}>

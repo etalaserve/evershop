@@ -16,7 +16,7 @@ jest.unstable_mockModule('../../../../services/getMulter.js', () => ({
 }));
 
 const middleware = (
-  await import('../../[auth,validatePath]multerFile.js')
+  await import('../../multerFile.js')
 ).default;
 
 const makeResponse = () => {

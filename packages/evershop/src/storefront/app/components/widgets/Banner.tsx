@@ -1,4 +1,5 @@
 import { AspectRatio } from '~/components/ui/aspect-ratio.js';
+import { Badge } from '~/components/ui/badge.js';
 import { Button } from '~/components/ui/button.js';
 import { imageUrl } from '~/lib/image.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
@@ -50,7 +51,7 @@ export function Banner({ widget }: WidgetComponentProps) {
   const op = Number.isFinite(s.overlayOpacity) ? (s.overlayOpacity as number) : 0.3;
 
   const image = (
-    <AspectRatio ratio={ratio} className="overflow-hidden rounded-lg bg-muted">
+    <AspectRatio ratio={ratio} className="overflow-hidden rounded-xl bg-muted">
       <img src={imageUrl(s.src)} alt={s.alt ?? ''} className="h-full w-full object-cover" />
     </AspectRatio>
   );
@@ -80,10 +81,14 @@ export function Banner({ widget }: WidgetComponentProps) {
               }
             />
           )}
-          <div className="relative flex max-w-md flex-col gap-2">
-            {s.eyebrow && <span className="text-sm font-medium uppercase tracking-wide">{s.eyebrow}</span>}
-            {s.heading && <h2 className="text-2xl font-semibold sm:text-3xl">{s.heading}</h2>}
-            {s.subText && <p className="text-sm">{s.subText}</p>}
+          <div className="relative flex max-w-md flex-col gap-3">
+            {s.eyebrow && (
+              <Badge variant="secondary" className="w-fit bg-white/90 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                {s.eyebrow}
+              </Badge>
+            )}
+            {s.heading && <h2 className="text-2xl font-semibold tracking-tight sm:text-4xl">{s.heading}</h2>}
+            {s.subText && <p className="text-sm sm:text-base">{s.subText}</p>}
             {(s.cta?.url || s.cta2?.url) && (
               <div className="mt-2 flex gap-3">
                 {ctaButton(s.cta, 'cta')}

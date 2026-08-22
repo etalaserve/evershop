@@ -16,9 +16,7 @@ export type Effect =
   | 'restart'
   | 'restart_cronjob'
   | 'restart_event'
-  | 'add_middleware'
   | 'remove_middleware'
-  | 'update_middleware'
   | 'add_component'
   | 'remove_component'
   | 'update_component'
@@ -107,13 +105,11 @@ export function detectEffect(event: Event): Effect {
     if (!isValidRouteFolder(routeFolder)) {
       return 'unknown'; // Not a valid route folder, skip
     }
-    if (event.type === 'create') {
-      return 'add_middleware'; // This is a middleware file
-    } else if (event.type === 'delete') {
-      return 'remove_middleware';
-    } else {
-      return 'update_middleware';
-    }
+    // Every route folder's middleware pipeline is declared in one
+    // `middlewares.ts` manifest, statically imported by the files it
+    // registers — there's no single-file granularity to hot-add/remove/update
+    // anymore, so any change here needs a fresh module graph.
+    return 'restart';
   } else if (minimatch(event.path.toString(), '**/api/*/route.json')) {
     const routeFolder = basename(dirname(event.path.toString()));
     if (!isValidRouteFolder(routeFolder)) {

@@ -98,7 +98,7 @@ export function PageBuilderBridge(): null {
 
     const handler = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      const raw = event.data as Partial<DataUpdateMessage> & { type?: string; enabled?: boolean; widgetUid?: string } | null;
+      const raw = event.data as Partial<DataUpdateMessage> & { type?: string; enabled?: boolean; widgetUid?: string; light?: string; dark?: string } | null;
       if (!raw) return;
 
       if (raw.type === 'pb-drag-start') {
@@ -112,6 +112,22 @@ export function PageBuilderBridge(): null {
       if (raw.type === 'globals-view') {
         if (raw.enabled) document.body.dataset.evershopGlobalsView = '1';
         else delete document.body.dataset.evershopGlobalsView;
+        return;
+      }
+      if (raw.type === 'theme-preview') {
+        const id = 'evershop-pb-theme-preview';
+        let style = document.getElementById(id) as HTMLStyleElement | null;
+        if (!style) {
+          style = document.createElement('style');
+          style.id = id;
+        }
+        // Appended to the END of <body>, not <head> — <ThemeStyle>'s own
+        // override tag (root.tsx's `App()`) is itself rendered inside
+        // <body>, later in document order than anything in <head>, so an
+        // equal-specificity `:root {...}` block only wins the cascade by
+        // coming after it in the DOM. Re-append on every update to stay last.
+        document.body.appendChild(style);
+        style.textContent = `:root{${raw.light ?? ''}}\n.dark{${raw.dark ?? ''}}`;
         return;
       }
       if (raw.type === 'layer-highlight') {

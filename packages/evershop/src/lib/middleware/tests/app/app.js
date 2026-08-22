@@ -52,17 +52,18 @@ const modules = [
 ];
 
 // Load routes and middleware functions
-modules.forEach((module) => {
+for (const module of modules) {
   try {
     // Load middleware functions
-    getModuleMiddlewares(module.path);
+    // eslint-disable-next-line no-await-in-loop
+    await getModuleMiddlewares(module.path);
     // Load routes
     loadModuleRoutes(module.path);
   } catch (e) {
     error(e);
     process.exit(0);
   }
-});
+}
 
 // TODO: load extensions, themes
 

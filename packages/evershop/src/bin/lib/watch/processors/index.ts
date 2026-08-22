@@ -4,7 +4,6 @@ import { addAdminRoute } from './addAdminRoute.js';
 import { addApiRoute } from './addApiRoute.js';
 import { addComponent } from './addComponent.js';
 import { addFrontStoreRoute } from './addFrontStoreRoute.js';
-import { addMiddleware } from './addMiddleware.js';
 import { deleteARoute } from './deleteARoute.js';
 import { removeMiddleware } from './removeMiddleware.js';
 import { restartCronJob } from './restartCronJob.js';
@@ -27,9 +26,7 @@ export const processors: Processor = {
   remove_api_route: deleteARoute,
   remove_admin_route: deleteARoute,
   remove_front_store_route: deleteARoute,
-  add_middleware: addMiddleware,
   remove_middleware: removeMiddleware,
-  update_middleware: () => {},
   update_component: () => {
     // No operation for update_component, as it is handled by the compiler}
   },

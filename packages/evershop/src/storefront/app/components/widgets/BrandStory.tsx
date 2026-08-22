@@ -1,3 +1,4 @@
+import { Badge } from '~/components/ui/badge.js';
 import { Button } from '~/components/ui/button.js';
 import { imageUrl } from '~/lib/image.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
@@ -25,8 +26,8 @@ export function BrandStory({ widget }: WidgetComponentProps) {
 
   const copy = (
     <div className="flex flex-col justify-center gap-3">
-      {s.eyebrow && <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.eyebrow}</span>}
-      <h2 className="text-2xl font-semibold sm:text-3xl">{s.heading}</h2>
+      {s.eyebrow && <Badge variant="secondary" className="w-fit text-[10px] font-semibold uppercase tracking-wide">{s.eyebrow}</Badge>}
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{s.heading}</h2>
       <p className="text-muted-foreground">{s.body}</p>
       {s.bodySecondary && <p className="text-muted-foreground">{s.bodySecondary}</p>}
       {layout === 'pull-quote' && s.pullQuote && (
@@ -45,7 +46,7 @@ export function BrandStory({ widget }: WidgetComponentProps) {
   }
 
   const image = (
-    <div className="overflow-hidden rounded-lg bg-muted">
+    <div className="overflow-hidden rounded-xl bg-muted shadow-sm">
       <img src={imageUrl(s.image)} alt={s.imageAlt ?? ''} className="h-full w-full object-cover" />
     </div>
   );

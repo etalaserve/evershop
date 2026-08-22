@@ -1,7 +1,7 @@
 import { app, bootstrap, close } from '../app/app.js';
 import axios from 'axios';
 import http from 'http';
-import errorHandler from '../app/modules/basecopy/pages/global/[response]errorHandler.js';
+import errorHandler from '../app/modules/basecopy/pages/global/errorHandler.js';
 
 import { jest, describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 

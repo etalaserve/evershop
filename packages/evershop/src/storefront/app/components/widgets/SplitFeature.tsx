@@ -1,4 +1,5 @@
 import { AspectRatio } from '~/components/ui/aspect-ratio.js';
+import { Badge } from '~/components/ui/badge.js';
 import { Button } from '~/components/ui/button.js';
 import { imageUrl } from '~/lib/image.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
@@ -29,7 +30,7 @@ export function SplitFeature({ widget }: WidgetComponentProps) {
   const alignClass = s.verticalAlign === 'top' ? 'items-start' : s.verticalAlign === 'bottom' ? 'items-end' : 'items-center';
 
   const image = (
-    <AspectRatio ratio={ratio} className="overflow-hidden rounded-lg bg-muted">
+    <AspectRatio ratio={ratio} className="overflow-hidden rounded-xl bg-muted shadow-sm">
       <img
         src={imageUrl(s.image)}
         alt={s.imageAlt ?? ''}
@@ -40,8 +41,8 @@ export function SplitFeature({ widget }: WidgetComponentProps) {
 
   const copy = (
     <div className="flex flex-col gap-3">
-      {s.eyebrow && <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.eyebrow}</span>}
-      <h2 className="text-2xl font-semibold sm:text-3xl">{s.heading}</h2>
+      {s.eyebrow && <Badge variant="secondary" className="w-fit text-[10px] font-semibold uppercase tracking-wide">{s.eyebrow}</Badge>}
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{s.heading}</h2>
       {s.body && <p className="text-muted-foreground">{s.body}</p>}
       {s.cta?.url && (
         <Button asChild className="mt-2 w-fit" variant={s.cta.style === 'outline' ? 'outline' : s.cta.style === 'link' ? 'link' : 'default'}>

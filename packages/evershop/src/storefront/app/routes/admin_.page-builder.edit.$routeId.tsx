@@ -10,6 +10,7 @@ import { PublishDialog } from '~/components/page-builder-admin/PublishDialog.js'
 import { RolloutDialog } from '~/components/page-builder-admin/RolloutDialog.js';
 import { SessionPicker } from '~/components/page-builder-admin/SessionPicker.js';
 import { SettingsDrawer, type SelectedWidget } from '~/components/page-builder-admin/SettingsDrawer.js';
+import { ThemeSheet } from '~/components/page-builder-admin/ThemeSheet.js';
 import { Topbar, type DeviceMode } from '~/components/page-builder-admin/Topbar.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs.js';
 import { gql } from '~/lib/graphql/client.js';
@@ -22,13 +23,15 @@ import {
   type RolloutPlanSessionResponse,
   type RouteResponse
 } from '~/lib/graphql/queries/page-builder-admin.js';
+import { STORE_SETTINGS_QUERY, type StoreSettingsResponse } from '~/lib/graphql/queries/settings.js';
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetFragment, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { getCurrentAdminUser } from '~/lib/admin/session.js';
 import { pageBuilderApi } from '~/lib/page-builder-admin/api.js';
 import { getOrCreateDraft } from '~/lib/page-builder-admin/changeset.js';
 import { buildAddWidgetOps, buildDeleteOps, buildMoveOp, buildUpdateSettingsOp } from '~/lib/page-builder-admin/operations.js';
 import { findPlacement, flattenWidgets } from '~/lib/page-builder-admin/widgetLookup.js';
-import { paletteEntry } from '~/lib/page-builder-admin/widgetPalette.js';
+import { paletteEntry, shuffleCandidates } from '~/lib/page-builder-admin/widgetPalette.js';
+import { resolveThemeTokens } from '~/lib/theme/tokens.js';
 import type { AppLoadContext } from '../../../bin/lib/createStorefrontMiddleware.js';
 
 const DEFAULT_AREA = 'content';
@@ -67,9 +70,10 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
     changesetToken = draft.token;
   }
 
-  const [changesetState, widgetsData] = await Promise.all([
+  const [changesetState, widgetsData, settingsData] = await Promise.all([
     gqlAdmin<ChangesetStateResponse>(CHANGESET_STATE_QUERY, { id: changesetId, route: routeId }, cookie),
-    gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: routeId, changeset: changesetToken })
+    gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: routeId, changeset: changesetToken }),
+    gql<StoreSettingsResponse>(STORE_SETTINGS_QUERY)
   ]);
 
   return {
@@ -82,12 +86,13 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
       operationCount: changesetState.changeset?.operationCountForRoute ?? 0
     },
     widgets: widgetsData.widgetsForRoute,
-    inRolloutSession: !!sessionToken
+    inRolloutSession: !!sessionToken,
+    themeTokens: resolveThemeTokens(settingsData.setting.themeTokens)
   };
 }
 
 export default function PageBuilderEditor() {
-  const { route, changeset, widgets, inRolloutSession } = useLoaderData<typeof loader>();
+  const { route, changeset, widgets, inRolloutSession, themeTokens } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [selected, setSelected] = useState<SelectedWidget | null>(null);
@@ -98,6 +103,7 @@ export default function PageBuilderEditor() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [rolloutOpen, setRolloutOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
 
   const reloadCanvas = useCallback(() => {
     iframeRef.current?.contentWindow?.location.reload();
@@ -234,8 +240,8 @@ export default function PageBuilderEditor() {
     });
   };
 
-  const handleAddFromPalette = (type: string) => {
-    const entry = paletteEntry(type);
+  const handleAddFromPalette = (variantId: string) => {
+    const entry = paletteEntry(variantId);
     if (!entry) return;
     const maxSort = Math.max(
       0,
@@ -258,6 +264,49 @@ export default function PageBuilderEditor() {
     });
   };
 
+  const clearArea = async () => {
+    const existing = flattenWidgets(widgets)
+      .flatMap((w) => w.placements.map((placement) => ({ widget: w, placement })))
+      .filter(({ placement }) => placement.area === DEFAULT_AREA);
+    for (const { widget, placement } of existing) {
+      const ops = buildDeleteOps({ route: route.id, instanceUuid: widget.uuid, placementUuid: placement.uuid });
+      for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
+    }
+  };
+
+  const handleShuffle = () => {
+    withBusy(async () => {
+      await clearArea();
+      const pool = shuffleCandidates();
+      const count = Math.min(pool.length, 4 + Math.floor(Math.random() * 3));
+      let sortOrder = 100;
+      for (let i = 0; i < count; i++) {
+        const idx = Math.floor(Math.random() * pool.length);
+        const entry = pool.splice(idx, 1)[0];
+        const { ops } = buildAddWidgetOps({
+          route: route.id,
+          area: DEFAULT_AREA,
+          sortOrder,
+          type: entry.type,
+          name: entry.label,
+          defaultSettings: entry.defaultSettings
+        });
+        for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
+        sortOrder += 100;
+      }
+      setSelected(null);
+      afterMutation();
+    });
+  };
+
+  const handleClear = () => {
+    withBusy(async () => {
+      await clearArea();
+      setSelected(null);
+      afterMutation();
+    });
+  };
+
   const handleLayerReorder = (widgetUid: string, oldSortOrder: number, newSortOrder: number) => {
     const found = findPlacement(widgets, widgetUid, DEFAULT_AREA);
     if (!found) return;
@@ -272,6 +321,24 @@ export default function PageBuilderEditor() {
     const next = !globalsView;
     setGlobalsView(next);
     postToCanvas({ type: 'globals-view', enabled: next });
+  };
+
+  const handleThemePreview = (light: string, dark: string) => {
+    postToCanvas({ type: 'theme-preview', light, dark });
+  };
+
+  const handleThemeApply = (light: string, dark: string) => {
+    withBusy(async () => {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ themeTokens: { ...themeTokens, customLightCss: light, customDarkCss: dark } })
+      });
+      if (!res.ok) throw new Error(`Theme save failed (${res.status})`);
+      setThemeOpen(false);
+      afterMutation();
+    });
   };
 
   return (
@@ -301,11 +368,14 @@ export default function PageBuilderEditor() {
             afterMutation();
           })
         }
+        onShuffle={handleShuffle}
+        onClear={handleClear}
         onPublish={() => setPublishOpen(true)}
         onDiscard={() => setDiscardOpen(true)}
         onToggleGlobalsView={toggleGlobalsView}
         onDeviceModeChange={setDeviceMode}
         onScheduleRollout={() => setRolloutOpen(true)}
+        onOpenTheme={() => setThemeOpen(true)}
       />
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-64 overflow-y-auto border-r border-border">
@@ -336,6 +406,13 @@ export default function PageBuilderEditor() {
         </main>
       </div>
       <SettingsDrawer widget={selected} onClose={() => setSelected(null)} onSave={handleSaveSettings} />
+      <ThemeSheet
+        open={themeOpen}
+        onOpenChange={setThemeOpen}
+        isBusy={isBusy}
+        onPreview={handleThemePreview}
+        onApply={handleThemeApply}
+      />
       <PublishDialog
         open={publishOpen}
         operationCount={changeset.operationCount}

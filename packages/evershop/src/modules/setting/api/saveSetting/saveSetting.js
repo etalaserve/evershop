@@ -5,6 +5,7 @@ import {
 } from '@evershop/postgres-query-builder';
 import { getAvailableLocales } from '../../../../lib/locale/dictionary.js';
 import { normalizeLocale } from '../../../../lib/locale/localeResolution.js';
+import { invalidateStorefrontCacheKey } from '../../../../lib/cache/invalidateStorefrontCache.js';
 import { warning } from '../../../../lib/log/logger.js';
 import { getConnection } from '../../../../lib/postgres/connection.js';
 import {
@@ -87,6 +88,13 @@ export default async (request, response, next) => {
     await commit(connection);
     // Refresh the setting
     await refreshSetting();
+    // The storefront's `fragment:settings` cache (root.tsx's STORE_SETTINGS_QUERY,
+    // which includes themeTokens) has no other invalidation path — without this,
+    // a saved theme/store-settings change doesn't show up live until the TTL expires.
+    const STOREFRONT_SETTINGS_FIELDS = ['storeName', 'storeDescription', 'logo', 'favicon', 'themeTokens'];
+    if (Object.keys(body).some((key) => STOREFRONT_SETTINGS_FIELDS.includes(key))) {
+      await invalidateStorefrontCacheKey('fragment:settings');
+    }
     if (warnings.length > 0) {
       warning(`saveSetting: ${warnings.join(' ')}`);
     }

@@ -158,6 +158,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   basic_menu: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'underline', label: 'Underline' }, { value: 'pill', label: 'Pill' }] },
     { key: 'isMain', label: 'Main menu', type: 'toggle' },
     { key: 'className', label: 'Extra CSS class', type: 'text' },
     {
@@ -175,6 +176,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   footer_menu: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'plain', label: 'Plain' }, { value: 'card', label: 'Card' }] },
     {
       key: 'columns',
       label: 'Columns',
@@ -199,6 +201,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   announcement_bar: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'static', label: 'Static' }, { value: 'rotating', label: 'Rotating' }] },
     { key: 'backgroundColor', label: 'Background color', type: 'color' },
     { key: 'textColor', label: 'Text color', type: 'color' },
     { key: 'delay', label: 'Delay (ms)', type: 'number', min: 0 },
@@ -216,6 +219,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   coupon_block: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'card', label: 'Card' }, { value: 'compact', label: 'Compact' }] },
     { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'body', label: 'Body', type: 'textarea' },
@@ -285,6 +289,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   tiered_categories: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'images', label: 'With images' }, { value: 'compact', label: 'Compact list' }] },
     { key: 'columns', label: 'Columns', type: 'number', min: 1, max: 6 },
     { key: 'imageAspect', label: 'Image aspect', type: 'select', options: ['1:1', '4:3', '3:4'].map((v) => ({ value: v, label: v })) },
     { key: 'showParentLink', label: 'Show parent link', type: 'toggle' },
@@ -314,6 +319,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   bento_grid: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'hero', label: 'Hero' }, { value: 'equal', label: 'Equal grid' }] },
     { key: 'gap', label: 'Gap', type: 'select', options: ['sm', 'md', 'lg'].map((v) => ({ value: v, label: v.toUpperCase() })) },
     { key: 'minHeight', label: 'Min tile height (px)', type: 'number', min: 1 },
     {
@@ -343,23 +349,28 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   // are plain text inputs (matches the same simplification every image
   // field already uses).
   related_products: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'limit', label: 'Max products', type: 'number', min: 1, max: 12 }
   ],
   frequently_bought_together: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'limit', label: 'Max products', type: 'number', min: 1, max: 12 }
   ],
   upsell_products: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'limit', label: 'Max products', type: 'number', min: 1, max: 12 }
   ],
   cart_frequently_bought_together: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'limit', label: 'Max products', type: 'number', min: 1, max: 12 }
   ],
 
   collection_products: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'collection', label: 'Collection code', type: 'text' },
     { key: 'count', label: 'Product count', type: 'number', min: 1, max: 48 },
     { key: 'countPerRow', label: 'Columns', type: 'number', min: 1, max: 6 },
@@ -370,6 +381,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   collection_stack: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'productCount', label: 'Products per row', type: 'number', min: 1, max: 12 },
     { key: 'countPerRow', label: 'Columns', type: 'number', min: 2, max: 6 },
     { key: 'divider', label: 'Show divider between rows', type: 'toggle' },
@@ -412,6 +424,7 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
   ],
 
   featured_blogs: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
     { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'subText', label: 'Subtext', type: 'text' },

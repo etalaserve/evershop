@@ -1,4 +1,4 @@
-import { Laptop, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
+import { Laptop, Paintbrush, Redo2, Shuffle as ShuffleIcon, Smartphone, Tablet, Trash2, Undo2 } from 'lucide-react';
 
 import { Button } from '~/components/ui/button.js';
 
@@ -13,11 +13,14 @@ export function Topbar({
   deviceMode,
   onUndo,
   onRedo,
+  onShuffle,
+  onClear,
   onPublish,
   onDiscard,
   onToggleGlobalsView,
   onDeviceModeChange,
-  onScheduleRollout
+  onScheduleRollout,
+  onOpenTheme
 }: {
   routeName: string;
   canUndo: boolean;
@@ -27,11 +30,14 @@ export function Topbar({
   deviceMode: DeviceMode;
   onUndo: () => void;
   onRedo: () => void;
+  onShuffle: () => void;
+  onClear: () => void;
   onPublish: () => void;
   onDiscard: () => void;
   onToggleGlobalsView: () => void;
   onDeviceModeChange: (mode: DeviceMode) => void;
   onScheduleRollout: () => void;
+  onOpenTheme: () => void;
 }) {
   return (
     // Plain div, not `<header>` — the editor route's `header, footer { display:
@@ -51,6 +57,10 @@ export function Topbar({
       <Button variant={globalsView ? 'secondary' : 'ghost'} size="sm" onClick={onToggleGlobalsView}>
         Globals
       </Button>
+      <Button variant="ghost" size="sm" onClick={onOpenTheme} title="Edit the site's color theme">
+        <Paintbrush className="mr-1.5 h-3.5 w-3.5" />
+        Theme
+      </Button>
       <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
         <Button variant={deviceMode === 'desktop' ? 'secondary' : 'ghost'} size="icon" onClick={() => onDeviceModeChange('desktop')} title="Desktop">
           <Laptop className="h-4 w-4" />
@@ -62,6 +72,14 @@ export function Topbar({
           <Smartphone className="h-4 w-4" />
         </Button>
       </div>
+      <Button variant="outline" size="sm" disabled={isBusy} onClick={onShuffle} title="Replace the page with a random composition">
+        <ShuffleIcon className="mr-1.5 h-3.5 w-3.5" />
+        Shuffle
+      </Button>
+      <Button variant="outline" size="sm" disabled={isBusy} onClick={onClear} title="Remove every widget on this page">
+        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+        Clear
+      </Button>
       <div className="flex-1" />
       <Button variant="outline" size="sm" disabled={isBusy} onClick={onScheduleRollout}>
         Schedule rollout

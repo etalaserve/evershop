@@ -1,11 +1,11 @@
 import http from 'http';
 import axios from 'axios';
 import { app, bootstrap, close } from '../app/app.js';
-import notFound from '../app/modules/basecopy/pages/global/[auth]notFound[response].js';
-import dummy from '../app/modules/basecopy/pages/global/[notFound]dummy[response].js';
-import response from '../app/modules/basecopy/pages/global/response[errorHandler].js';
-import loadProductImage from '../app/modules/404page/pages/frontStore/product/[loadProduct]loadProductImage.js';
-import loadCategory from '../app/modules/404page/pages/frontStore/product/[loadProduct]loadCategory.js';
+import notFound from '../app/modules/basecopy/pages/global/notFound.js';
+import dummy from '../app/modules/basecopy/pages/global/dummy.js';
+import response from '../app/modules/basecopy/pages/global/response.js';
+import loadProductImage from '../app/modules/404page/pages/frontStore/product/loadProductImage.js';
+import loadCategory from '../app/modules/404page/pages/frontStore/product/loadCategory.js';
 import loadProduct from '../app/modules/404page/pages/frontStore/product/loadProduct.js';
 
 import { jest, describe, it, expect, beforeAll, afterAll } from '@jest/globals';

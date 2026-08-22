@@ -1,15 +1,15 @@
 import { app, bootstrap, close } from '../app/app.js';
 import axios from 'axios';
 import http from 'http';
-import loadProductAttribute from '../app/modules/handler/pages/frontStore/middleware/[loadProductImage]loadAttribute.js';
-import loadProductImage from '../app/modules/handler/pages/frontStore/middleware/[loadProduct]loadProductImage.js';
-import loadCategory from '../app/modules/handler/pages/frontStore/middleware/[loadProduct]loadCategory.js';
-import loadProduct from '../app/modules/handler/pages/frontStore/middleware/loadProduct[loadAttribute].js';
-import loadProductOption from '../app/modules/handler/pages/frontStore/middleware/[loadAttribute]loadOptions.js';
-import syncOne from '../app/modules/handler/pages/frontStore/middleware/syncOne[loadAttribute].js';
-import asyncOne from '../app/modules/handler/pages/frontStore/middleware/asyncOne[loadAttribute].js';
-import checkExecutionOrder from '../app/modules/handler/pages/frontStore/middleware/[syncOne,asyncOne]checkExecutionOrder[loadAttribute].js';
-import checkExecutionOrderAsync from '../app/modules/handler/pages/frontStore/middleware/[syncOne,asyncOne]checkExecutionOrderAsync[loadAttribute].js';
+import loadProductAttribute from '../app/modules/handler/pages/frontStore/middleware/loadAttribute.js';
+import loadProductImage from '../app/modules/handler/pages/frontStore/middleware/loadProductImage.js';
+import loadCategory from '../app/modules/handler/pages/frontStore/middleware/loadCategory.js';
+import loadProduct from '../app/modules/handler/pages/frontStore/middleware/loadProduct.js';
+import loadProductOption from '../app/modules/handler/pages/frontStore/middleware/loadOptions.js';
+import syncOne from '../app/modules/handler/pages/frontStore/middleware/syncOne.js';
+import asyncOne from '../app/modules/handler/pages/frontStore/middleware/asyncOne.js';
+import checkExecutionOrder from '../app/modules/handler/pages/frontStore/middleware/checkExecutionOrder.js';
+import checkExecutionOrderAsync from '../app/modules/handler/pages/frontStore/middleware/checkExecutionOrderAsync.js';
 import { jest, describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 
 jest.setTimeout(80000);

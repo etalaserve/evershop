@@ -21,31 +21,33 @@ export const createApp = async () => {
   const modules = getCoreModules();
 
   // Load routes and middleware functions
-  modules.forEach((module) => {
+  for (const module of modules) {
     try {
       // Load middleware functions
-      getModuleMiddlewares(module.path);
+      // eslint-disable-next-line no-await-in-loop
+      await getModuleMiddlewares(module.path);
       // Load routes
       loadModuleRoutes(module.path);
     } catch (e) {
       error(e);
       process.exit(0);
     }
-  });
+  }
 
   /** Load extensions */
   const extensions = getEnabledExtensions();
-  extensions.forEach((extension) => {
+  for (const extension of extensions) {
     try {
       // Load middleware functions
-      getModuleMiddlewares(extension.path);
+      // eslint-disable-next-line no-await-in-loop
+      await getModuleMiddlewares(extension.path);
       // Load routes
       loadModuleRoutes(extension.path);
     } catch (e) {
       error(e);
       process.exit(0);
     }
-  });
+  }
 
   // Adding default middlewares
   addDefaultMiddlewareFuncs(app);

@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 
 const middleware = (
   await import(
-    '../../api/saveSetting/[bodyParser,auth]validateRecommendationSettings[saveSetting].js'
+    '../../api/saveSetting/validateRecommendationSettings.js'
   )
 ).default;
 

@@ -1,11 +1,23 @@
 import { existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
-import { addMiddleware } from './addMiddleware.js';
+import { pathToFileURL } from 'url';
 import { Handler } from './Handler.js';
-import { scanForMiddlewareFunctions } from './scanForMiddlewareFunctions.js';
 import { sortMiddlewares } from './sort.js';
 
 const middlewareList = Handler.middlewares;
+
+/**
+ * Every route folder self-registers its middleware via a `middlewares.js`
+ * (compiled from `middlewares.ts`), which calls `registerMiddleware()`/
+ * `defineMiddlewares()` (registry.js) as a side effect when imported — same
+ * pattern a module's own `bootstrap.js` already uses.
+ */
+async function loadRouteMiddlewares(folder) {
+  const manifestPath = resolve(folder, 'middlewares.js');
+  if (existsSync(manifestPath)) {
+    await import(pathToFileURL(manifestPath).toString());
+  }
+}
 
 export function getAdminMiddlewares(routeId) {
   return sortMiddlewares(
@@ -33,15 +45,11 @@ export function getFrontMiddlewares(routeId) {
  * @param   {string}  path  The path of the module
  *
  */
-export function getModuleMiddlewares(path) {
+export async function getModuleMiddlewares(path) {
   if (existsSync(resolve(path, 'pages'))) {
     // Scan for the application level middleware
     if (existsSync(resolve(path, 'pages', 'global'))) {
-      scanForMiddlewareFunctions(resolve(path, 'pages', 'global')).forEach(
-        (m) => {
-          addMiddleware(m);
-        }
-      );
+      await loadRouteMiddlewares(resolve(path, 'pages', 'global'));
     }
     // Scan for the admin level middleware
     if (existsSync(resolve(path, 'pages', 'admin'))) {
@@ -50,13 +58,10 @@ export function getModuleMiddlewares(path) {
       })
         .filter((dirent) => dirent.isDirectory())
         .map((dirent) => dirent.name);
-      routes.forEach((route) => {
-        scanForMiddlewareFunctions(
-          resolve(path, 'pages', 'admin', route)
-        ).forEach((m) => {
-          addMiddleware(m);
-        });
-      });
+      for (const route of routes) {
+        // eslint-disable-next-line no-await-in-loop
+        await loadRouteMiddlewares(resolve(path, 'pages', 'admin', route));
+      }
     }
 
     // Scan for the frontStore level middleware
@@ -66,13 +71,10 @@ export function getModuleMiddlewares(path) {
       })
         .filter((dirent) => dirent.isDirectory())
         .map((dirent) => dirent.name);
-      routes.forEach((route) => {
-        scanForMiddlewareFunctions(
-          resolve(path, 'pages', 'frontStore', route)
-        ).forEach((m) => {
-          addMiddleware(m);
-        });
-      });
+      for (const route of routes) {
+        // eslint-disable-next-line no-await-in-loop
+        await loadRouteMiddlewares(resolve(path, 'pages', 'frontStore', route));
+      }
     }
   }
 
@@ -81,11 +83,10 @@ export function getModuleMiddlewares(path) {
     const routes = readdirSync(resolve(path, 'api'), { withFileTypes: true })
       .filter((dirent) => dirent.isDirectory())
       .map((dirent) => dirent.name);
-    routes.forEach((route) => {
-      scanForMiddlewareFunctions(resolve(path, 'api', route)).forEach((m) => {
-        addMiddleware(m);
-      });
-    });
+    for (const route of routes) {
+      // eslint-disable-next-line no-await-in-loop
+      await loadRouteMiddlewares(resolve(path, 'api', route));
+    }
   }
 }
 

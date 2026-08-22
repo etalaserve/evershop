@@ -23,17 +23,19 @@ export function TieredCategories({ widget }: WidgetComponentProps) {
     columns?: number;
     imageAspect?: string;
     showParentLink?: boolean;
+    variant?: 'images' | 'compact';
   };
   const groups = s.groups ?? [];
   if (groups.length === 0) return null;
+  const isCompact = s.variant === 'compact';
   const columns = s.columns ?? Math.min(4, groups.length);
   const ratio = s.imageAspect === '1:1' ? 1 : s.imageAspect === '4:3' ? 4 / 3 : 3 / 4;
 
   return (
     <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {groups.map((group) => (
-        <div key={group.id} className="space-y-3">
-          {group.image && (
+        <div key={group.id} className={isCompact ? 'space-y-2 rounded-lg border border-border p-4' : 'space-y-3'}>
+          {!isCompact && group.image && (
             <AspectRatio ratio={ratio} className="overflow-hidden rounded-lg bg-muted">
               <img src={imageUrl(group.image)} alt={group.imageAlt ?? group.parent.label} className="h-full w-full object-cover" />
             </AspectRatio>

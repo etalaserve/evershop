@@ -25,15 +25,15 @@ export function ProductHero({ extra }: WidgetComponentProps) {
   const heroImage = data.image || product.image?.url;
 
   const image = (
-    <AspectRatio ratio={1} className="overflow-hidden rounded-lg bg-muted">
+    <AspectRatio ratio={1} className="overflow-hidden rounded-xl bg-muted shadow-sm">
       {heroImage && <img src={imageUrl(heroImage)} alt={data.imageAlt || product.name} className="h-full w-full object-cover" />}
     </AspectRatio>
   );
 
   const copy = (
     <div className="flex flex-col justify-center gap-3">
-      {data.eyebrow && <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{data.eyebrow}</span>}
-      <h2 className="text-2xl font-semibold sm:text-3xl">{product.name}</h2>
+      {data.eyebrow && <Badge variant="secondary" className="w-fit text-[10px] font-semibold uppercase tracking-wide">{data.eyebrow}</Badge>}
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{product.name}</h2>
       <div className="flex items-center gap-2">
         {onSale ? (
           <>

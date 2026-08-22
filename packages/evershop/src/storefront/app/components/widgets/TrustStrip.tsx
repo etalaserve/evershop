@@ -1,4 +1,5 @@
 import { imageUrl } from '~/lib/image.js';
+import { cn } from '~/lib/utils.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
 
 interface TrustItem {
@@ -20,20 +21,23 @@ export function TrustStrip({ widget }: WidgetComponentProps) {
   const items = s.items ?? [];
   if (items.length === 0) return null;
   const columns = s.columns || Math.min(4, items.length);
-  const align = s.alignment === 'left' ? 'text-left items-start' : 'text-center items-center';
+  const isCentered = s.alignment !== 'left';
+  const align = isCentered ? 'text-center items-center' : 'text-left items-start';
 
   return (
     <div
-      className={`evershop-trust-strip grid gap-6 py-6 ${s.divider ? 'divide-y sm:divide-y-0 sm:divide-x divide-border' : ''}`}
+      className={cn('evershop-trust-strip grid gap-6 py-6', s.divider && 'divide-y sm:divide-y-0 sm:divide-x divide-border')}
       style={{ gridTemplateColumns: `repeat(${Math.min(columns, items.length)}, minmax(0, 1fr))` }}
     >
       {items.map((item) => {
         const body = (
-          <div className={`flex flex-col gap-1 px-2 py-2 ${align}`}>
+          <div className={cn('flex flex-col gap-2 px-3 py-2', align)}>
             {s.showIcons !== false && item.icon && (
-              <img src={imageUrl(item.icon)} alt="" className="mx-auto h-8 w-8 object-contain" />
+              <span className={cn('flex h-11 w-11 items-center justify-center rounded-full bg-muted', isCentered && 'mx-auto')}>
+                <img src={imageUrl(item.icon)} alt="" className="h-5 w-5 object-contain" />
+              </span>
             )}
-            <p className="font-medium">{item.title}</p>
+            <p className="text-sm font-semibold">{item.title}</p>
             {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
           </div>
         );

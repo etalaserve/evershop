@@ -1,12 +1,8 @@
 import { existsSync } from 'fs';
-import path, { dirname } from 'path';
-import { error } from '../log/logger.js';
+import { dirname } from 'path';
 import { getRoutes } from '../router/Router.js';
 import isDevelopmentMode from '../util/isDevelopmentMode.js';
-import isProductionMode from '../util/isProductionMode.js';
 import isErrorHandlerTriggered from './isErrorHandlerTriggered.js';
-import { noDublicateId } from './noDuplicateId.js';
-import { parseFromFile } from './parseFromFile.js';
 import { sortMiddlewares } from './sort.js';
 
 export class Handler {
@@ -16,6 +12,7 @@ export class Handler {
 
   static addMiddleware(middleware) {
     this.middlewares.push(middleware);
+    this.invalidateSortCache();
   }
 
   static getMiddlewares() {
@@ -26,9 +23,25 @@ export class Handler {
     return this.middlewares.find((m) => m.id === id);
   }
 
+  /**
+   * `getMiddlewareByRoute`/`getAppLevelMiddlewares` used to only cache their
+   * sorted result in production — in dev, every single request re-ran
+   * `sortMiddlewares` from scratch (previously an O(n^2) sort too — see
+   * sort.js), which is why every route, including ones that touch no
+   * database or GraphQL at all (e.g. a 404), paid a constant per-request
+   * tax. Caching in dev too is safe as long as it's invalidated whenever
+   * `this.middlewares` actually changes — the three mutators below
+   * (`addMiddleware`/`removeMiddleware`/`removeMiddlewares`) are the only
+   * places that happens.
+   */
+  static invalidateSortCache() {
+    this.sortedMiddlewarePerRoute = {};
+    this.sortedAppLevelMiddlewares = {};
+  }
+
   static getMiddlewareByRoute(route) {
     const routeId = route.id;
-    if (isProductionMode() && this.sortedMiddlewarePerRoute[routeId]) {
+    if (this.sortedMiddlewarePerRoute[routeId]) {
       return this.sortedMiddlewarePerRoute[routeId];
     }
     const region = route.isApi ? 'api' : 'pages';
@@ -67,13 +80,19 @@ export class Handler {
   }
 
   static getAppLevelMiddlewares(region) {
-    return sortMiddlewares(
+    if (this.sortedAppLevelMiddlewares[region]) {
+      return this.sortedAppLevelMiddlewares[region];
+    }
+    const sorted = sortMiddlewares(
       this.middlewares.filter((m) => m.scope === 'app' && m.region === region)
     );
+    this.sortedAppLevelMiddlewares[region] = sorted;
+    return sorted;
   }
 
   static removeMiddleware(path) {
     this.middlewares = this.middlewares.filter((m) => m.path !== path);
+    this.invalidateSortCache();
   }
 
   static removeMiddlewares(basePath) {
@@ -86,21 +105,7 @@ export class Handler {
         return true;
       }
     });
-  }
-
-  static addMiddlewareFromPath(path) {
-    if (!existsSync(path) || !path.endsWith('.js')) {
-      throw new Error(`Middleware file ${path} does not exist`);
-    } else {
-      const middlewares = parseFromFile(path);
-      middlewares.forEach((middleware) => {
-        if (noDublicateId(this.middlewares, middleware)) {
-          this.addMiddleware(middleware);
-        } else {
-          error(`Duplicate middleware id: ${middleware.id}`);
-        }
-      });
-    }
+    this.invalidateSortCache();
   }
 
   static middleware() {
@@ -151,3 +156,4 @@ export class Handler {
 }
 Handler.middlewares = [];
 Handler.sortedMiddlewarePerRoute = {};
+Handler.sortedAppLevelMiddlewares = {};

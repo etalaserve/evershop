@@ -6,6 +6,8 @@ import { Button } from '~/components/ui/button.js';
 import type { ProductCard as ProductCardData } from '~/lib/graphql/queries/catalog.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
 
+import { ProductRail } from './ProductRail.js';
+
 interface Extra {
   heading: string | null;
   subText: string | null;
@@ -16,7 +18,7 @@ interface Extra {
 }
 
 export function CollectionProducts({ widget, extra }: WidgetComponentProps) {
-  const s = widget.rawSettings as { countPerRow?: number };
+  const s = widget.rawSettings as { countPerRow?: number; variant?: 'grid' | 'carousel' };
   const data = extra as Extra | null | undefined;
   if (!data || data.products.length === 0) return null;
   const columns = Math.min(6, Math.max(1, s.countPerRow ?? 4));
@@ -25,7 +27,7 @@ export function CollectionProducts({ widget, extra }: WidgetComponentProps) {
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
-          {data.heading && <h2 className="text-lg font-semibold">{data.heading}</h2>}
+          {data.heading && <h2 className="text-lg font-semibold tracking-tight">{data.heading}</h2>}
           {data.subText ? <p className="text-sm text-muted-foreground">{data.subText}</p> : <RichContent rows={data.description ?? []} />}
         </div>
         {data.viewAllLink && (
@@ -34,11 +36,15 @@ export function CollectionProducts({ widget, extra }: WidgetComponentProps) {
           </Button>
         )}
       </div>
-      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {data.products.map((product) => (
-          <ProductCard key={product.productId} product={product} />
-        ))}
-      </div>
+      {s.variant === 'carousel' ? (
+        <ProductRail products={data.products} columns={columns} />
+      ) : (
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+          {data.products.map((product) => (
+            <ProductCard key={product.productId} product={product} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

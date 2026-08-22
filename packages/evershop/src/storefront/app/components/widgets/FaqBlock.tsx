@@ -64,7 +64,7 @@ export function FaqBlock({ widget }: WidgetComponentProps) {
             <div key={section.id}>
               {section.heading && <h3 className="mb-2 text-lg font-semibold">{section.heading}</h3>}
               {s.allowMultipleOpen === false ? (
-                <Accordion type="single" collapsible className="rounded-md border border-border px-3">
+                <Accordion type="single" collapsible className="rounded-xl border border-border px-4 shadow-sm">
                   {(section.items ?? []).map((item) => (
                     <AccordionItem key={item.id} value={item.id}>
                       <AccordionTrigger>{item.question}</AccordionTrigger>
@@ -73,7 +73,7 @@ export function FaqBlock({ widget }: WidgetComponentProps) {
                   ))}
                 </Accordion>
               ) : (
-                <Accordion type="multiple" className="rounded-md border border-border px-3">
+                <Accordion type="multiple" className="rounded-xl border border-border px-4 shadow-sm">
                   {(section.items ?? []).map((item) => (
                     <AccordionItem key={item.id} value={item.id}>
                       <AccordionTrigger>{item.question}</AccordionTrigger>
