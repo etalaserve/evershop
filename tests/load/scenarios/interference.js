@@ -34,6 +34,34 @@ const HUB = __ENV.HUB_URL || 'http://localhost:8000';
 const HUB_TOKEN = __ENV.HUB_TOKEN || '';
 
 const PEAK_VUS = Number(__ENV.PEAK_VUS || 100);
+
+/**
+ * Give each VU a distinct client IP.
+ *
+ * The site-wide limiter is per-IP (300 page req/min). Real shoppers each have
+ * their own address, so that limit is not a capacity ceiling for them — but a
+ * load generator is one machine, so without this every virtual user shares a
+ * single bucket and the test measures the limiter rather than the app. Sending
+ * a per-VU X-Forwarded-For reproduces what a real proxy would present.
+ *
+ * Only meaningful against a target running with TRUST_PROXY_HOPS set, which is
+ * also the only configuration where the header is trusted at all — so this
+ * cannot be used to evade the limiter on a directly-exposed instance.
+ */
+const SPOOF_IPS = __ENV.SPOOF_CLIENT_IPS === '1';
+
+/** A distinct RFC 5737 documentation address per virtual user. */
+function clientIp() {
+  const id = exec.vu.idInTest; // 1-based, unique across all scenarios
+  return `198.51.100.${(id % 254) + 1}`;
+}
+
+/** Request params carrying this VU's simulated client address. */
+function asClient(tags, extra) {
+  const headers = { ...(extra || {}) };
+  if (SPOOF_IPS) headers['X-Forwarded-For'] = clientIp();
+  return { tags, headers, timeout: '30s' };
+}
 const FLOOD_SECONDS = Number(__ENV.FLOOD_SECONDS || 120);
 const QUIET_SECONDS = Number(__ENV.QUIET_SECONDS || 45);
 
@@ -143,48 +171,44 @@ export const options = {
 export function storefrontFunnel() {
   // A shopper's path, not a single URL: home -> category -> product. This is
   // what exercises SSR, GraphQL, Postgres and the Redis cache together.
-  const home = http.get(`${STORE}/`, { tags: { step: 'home' } });
+  const home = http.get(`${STORE}/`, asClient({ step: 'home' }));
   check(home, { 'home 200': (r) => r.status === 200 });
   sleep(0.5);
 
-  const cat = http.get(`${STORE}/category/${__ENV.CATEGORY_KEY || 'kids'}`, {
-    tags: { step: 'category' }
-  });
+  const cat = http.get(
+    `${STORE}/category/${__ENV.CATEGORY_KEY || 'kids'}`,
+    asClient({ step: 'category' })
+  );
   check(cat, { 'category 200': (r) => r.status === 200 });
   sleep(0.5);
 
   const product = http.get(
     `${STORE}/product/${__ENV.PRODUCT_KEY || 'ceramic-coffee-cup-white'}`,
-    { tags: { step: 'product' } }
+    asClient({ step: 'product' })
   );
   check(product, { 'product 200': (r) => r.status === 200 });
   sleep(1);
 }
 
 export function adminProbe() {
-  const res = http.get(`${STORE}/admin/login`, {
-    tags: { probe: 'admin' },
-    timeout: '30s'
-  });
+  const res = http.get(`${STORE}/admin/login`, asClient({ probe: 'admin' }));
   const ok = res.status === 200;
   adminUp.add(ok);
   (phase() === 'flood' ? adminFlood : adminQuiet).add(res.timings.duration);
 }
 
 export function hubProbe() {
-  const params = {
-    tags: { probe: 'hub' },
-    timeout: '30s',
-    headers: HUB_TOKEN ? { Authorization: `Bearer ${HUB_TOKEN}` } : {}
-  };
-  const res = http.get(`${HUB}/api/instances`, params);
+  const res = http.get(
+    `${HUB}/api/instances`,
+    asClient({ probe: 'hub' }, HUB_TOKEN ? { Authorization: `Bearer ${HUB_TOKEN}` } : {})
+  );
   const ok = res.status === 200;
   hubUp.add(ok);
   (phase() === 'flood' ? hubFlood : hubQuiet).add(res.timings.duration);
 }
 
 export function storefrontProbe() {
-  const res = http.get(`${STORE}/`, { tags: { probe: 'store' }, timeout: '30s' });
+  const res = http.get(`${STORE}/`, asClient({ probe: 'store' }));
   (phase() === 'flood' ? storeFlood : storeQuiet).add(res.timings.duration);
 }
 

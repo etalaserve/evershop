@@ -40,6 +40,21 @@ Tunables: `PEAK_VUS` (default 100), `FLOOD_SECONDS` (120), `QUIET_SECONDS`
 not the dev server — the dev server compiles on demand and you would be
 measuring webpack.
 
+### `SPOOF_CLIENT_IPS=1` — you almost certainly need this
+
+The app rate-limits per client IP (300 page requests/minute). Real shoppers
+each have their own address, so that limit is not a capacity ceiling for them.
+A load generator is one machine, so without help every virtual user shares one
+bucket and **the test measures the limiter instead of the app** — a 400-request
+burst from one IP gets 303 through; the same 400 with distinct addresses all
+succeed.
+
+`SPOOF_CLIENT_IPS=1` gives each VU its own `X-Forwarded-For`, reproducing what
+a real proxy presents. It only does anything against a target running with
+`TRUST_PROXY_HOPS` set — which is also the only configuration where the header
+is trusted at all, so it cannot be used to evade the limiter on a
+directly-exposed instance.
+
 ## Reading the result
 
 ```
