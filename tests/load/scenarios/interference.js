@@ -249,13 +249,14 @@ export function handleSummary(data) {
   const dropped = data.metrics.dropped_iterations?.values?.count ?? 0;
   text += `dropped iterations : ${dropped}${dropped ? '  <-- GENERATOR SATURATED, run is invalid' : ''}\n`;
 
-  // Into a per-run directory rather than the repo root: runs are meant to be
-  // compared against each other, and `stress-report-*` is already ignored.
+  // Flat filenames, not a per-run directory: k6 writes summary files but does
+  // not create directories for them, so a nested path silently fails at the
+  // very end of a long run. The timestamp is in the filename instead, and
+  // `stress-report-*` is already gitignored.
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const dir = `stress-report-${stamp}`;
   return {
     stdout: text,
-    [`${dir}/summary.json`]: JSON.stringify({ rows, metrics: data.metrics }, null, 2),
-    [`${dir}/report.txt`]: text
+    [`stress-report-${stamp}.json`]: JSON.stringify({ rows, metrics: data.metrics }, null, 2),
+    [`stress-report-${stamp}.txt`]: text
   };
 }
