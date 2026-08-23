@@ -225,8 +225,13 @@ export function handleSummary(data) {
   const dropped = data.metrics.dropped_iterations?.values?.count ?? 0;
   text += `dropped iterations : ${dropped}${dropped ? '  <-- GENERATOR SATURATED, run is invalid' : ''}\n`;
 
+  // Into a per-run directory rather than the repo root: runs are meant to be
+  // compared against each other, and `stress-report-*` is already ignored.
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dir = `stress-report-${stamp}`;
   return {
     stdout: text,
-    'summary.json': JSON.stringify({ rows, metrics: data.metrics }, null, 2)
+    [`${dir}/summary.json`]: JSON.stringify({ rows, metrics: data.metrics }, null, 2),
+    [`${dir}/report.txt`]: text
   };
 }

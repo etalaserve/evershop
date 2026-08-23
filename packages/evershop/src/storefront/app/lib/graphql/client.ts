@@ -23,7 +23,16 @@ import { GraphQLClient } from 'graphql-request';
  */
 const endpoint = `http://127.0.0.1:${process.env.PORT ?? 3000}/api/graphql`;
 
-export const graphqlClient = new GraphQLClient(endpoint);
+export const graphqlClient = new GraphQLClient(endpoint, {
+  // Identifies this as the app calling itself to render a page, so the
+  // site-wide rate limiter does not count it against the shared loopback
+  // bucket. Only honoured on a loopback connection — see rateLimit.ts.
+  // Literal rather than an import: the constant lives in
+  // modules/base/services/rateLimit.ts, which pulls in express-rate-limit —
+  // dragging that into this Vite-bundled tree to share one string is a worse
+  // trade than repeating it. Keep the two in sync.
+  headers: { 'x-evershop-internal': '1' }
+});
 
 /**
  * Thin wrapper so callers don't import graphql-request directly.

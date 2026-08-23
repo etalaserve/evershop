@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'net';
 import express from 'express';
-import { classifyRequest, rateLimiter } from '../../services/rateLimit.js';
+import { classifyRequest, isLoopback, rateLimiter } from '../../services/rateLimit.js';
 
 describe('classifyRequest', () => {
   it.each([
@@ -59,5 +59,23 @@ describe('rateLimiter behaviour', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe('isLoopback', () => {
+  it.each([
+    ['127.0.0.1', true],
+    ['127.0.0.53', true],
+    ['::1', true],
+    // Node reports a v4 client on a dual-stack socket in this form, which is
+    // what the storefront's own SSR self-calls actually arrive as.
+    ['::ffff:127.0.0.1', true],
+    ['203.0.113.9', false],
+    ['::ffff:203.0.113.9', false],
+    // Not loopback despite starting with a 1 — guards a naive prefix test.
+    ['12.7.0.1', false],
+    [undefined, false]
+  ])('isLoopback(%s) === %s', (ip, expected) => {
+    expect(isLoopback(ip as string | undefined)).toBe(expected);
   });
 });

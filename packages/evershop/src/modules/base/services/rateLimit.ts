@@ -44,6 +44,26 @@ function isExempt(path: string): boolean {
   );
 }
 
+/**
+ * Set by the storefront's own GraphQL clients on their loopback self-calls.
+ * Meaningless on its own — see rateLimiter() for why it is only honoured
+ * together with a loopback source address.
+ */
+export const INTERNAL_REQUEST_HEADER = 'x-evershop-internal';
+
+/**
+ * Is this request from the machine itself?
+ *
+ * Covers IPv4 loopback, IPv6 `::1`, and the IPv4-mapped `::ffff:127.0.0.1`
+ * form Node reports when a v4 client connects to a dual-stack socket — which
+ * is what the storefront's own SSR self-calls actually look like.
+ */
+export function isLoopback(ip: string | undefined): boolean {
+  if (!ip) return false;
+  const bare = ip.startsWith('::ffff:') ? ip.slice('::ffff:'.length) : ip;
+  return bare === '::1' || bare === '127.0.0.1' || bare.startsWith('127.');
+}
+
 /** Sensitive credential endpoints (POST) that get the strict `auth` tier. */
 const AUTH_POST_PATHS = new Set<string>([
   '/customer/login', // storefront login (customerLoginJson)
@@ -155,6 +175,27 @@ export function rateLimiter(
   response: Response,
   next: NextFunction
 ): void {
+  // The storefront renders server-side by calling this same process over
+  // loopback (`http://127.0.0.1:$PORT/api/graphql` — see
+  // storefront/app/lib/graphql/client.ts), so every page render spends one
+  // request from 127.0.0.1's bucket. Counting those turns the limiter on the
+  // app itself: the `api` tier allows 120/min, which caps the WHOLE store at
+  // ~120 renders per minute no matter how many customers there are, and past
+  // that the loader receives a 429 from its own API, throws, and the customer
+  // gets a 500 instead of a page. Measured: a 400-request burst returned 165
+  // 429s and 178 500s.
+  //
+  // Both conditions are required, and neither is sufficient. Exempting all
+  // loopback traffic would silently disable the limiter entirely whenever a
+  // reverse proxy runs on the same host and TRUST_PROXY_HOPS is wrong, since
+  // every customer would then appear to connect from 127.0.0.1. Exempting on
+  // the header alone would let anyone opt out by sending it. Together they
+  // describe only this process talking to itself.
+  if (isLoopback(request.ip) && request.get(INTERNAL_REQUEST_HEADER)) {
+    next();
+    return;
+  }
+
   const tier = classifyRequest(request.method, request.path);
   if (tier === 'exempt') {
     next();
