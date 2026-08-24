@@ -1,14 +1,22 @@
 import { Link, useLoaderData, useRevalidator } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
-
 import { buttonVariants } from '~/components/ui/button.js';
 import { Separator } from '~/components/ui/separator.js';
+import { WidgetArea } from '~/components/widgets/WidgetArea.js';
 import { removeCartItem } from '~/lib/cart/client.js';
 import { gql } from '~/lib/graphql/client.js';
 import { CART_QUERY, type CartResponse } from '~/lib/graphql/queries/cart.js';
+import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { imageUrl } from '~/lib/image.js';
 import { buildMeta } from '~/lib/seo.js';
 import { cn } from '~/lib/utils.js';
+import { resolveWidgetExtras } from '~/lib/widgets/resolveWidgetExtras.js';
+
+// Matches `cart`'s legacy route id (`editable: true`). The
+// `cart_frequently_bought_together` widget type already existed — this is
+// the first route that actually mounts a WidgetArea a merchant can drop it
+// into.
+const ROUTE_ID = 'cart';
 
 export const meta: MetaFunction = () => buildMeta({ title: 'Your cart', noindex: true });
 
@@ -17,12 +25,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // forward the browser's cookies on its own for this server-side call, so
   // it has to be passed through explicitly.
   const cookie = request.headers.get('Cookie');
-  const result = await gql<CartResponse>(CART_QUERY, undefined, cookie ? { Cookie: cookie } : undefined);
-  return { cart: result.myCart };
+  const changeset = new URL(request.url).searchParams.get('changeset');
+
+  const [result, widgetData] = await Promise.all([
+    gql<CartResponse>(CART_QUERY, undefined, cookie ? { Cookie: cookie } : undefined),
+    gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: ROUTE_ID, changeset })
+  ]);
+  const widgets = widgetData.widgetsForRoute;
+  const extras = await resolveWidgetExtras(widgets, cookie);
+
+  return { cart: result.myCart, widgets, extras };
 }
 
 export default function CartPage() {
-  const { cart } = useLoaderData<typeof loader>();
+  const { cart, widgets, extras } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
 
   async function handleRemove(itemUuid: string) {
@@ -32,11 +48,14 @@ export default function CartPage() {
 
   if (!cart || !cart.items || cart.items.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 px-4 py-16 text-center">
-        <h1 className="text-2xl font-semibold">Your cart is empty</h1>
-        <Link to="/" className={cn(buttonVariants())}>
-          Continue shopping
-        </Link>
+      <div className="mx-auto max-w-3xl space-y-10 px-4 py-16">
+        <div className="space-y-4 text-center">
+          <h1 className="text-2xl font-semibold">Your cart is empty</h1>
+          <Link to="/" className={cn(buttonVariants())}>
+            Continue shopping
+          </Link>
+        </div>
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
       </div>
     );
   }
@@ -77,6 +96,7 @@ export default function CartPage() {
       <Link to="/checkout" className={cn(buttonVariants({ size: 'lg' }), 'w-full')}>
         Checkout
       </Link>
+      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
     </div>
   );
 }

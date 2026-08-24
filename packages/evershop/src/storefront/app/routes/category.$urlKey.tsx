@@ -1,26 +1,42 @@
 import { data, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
-
 import { ProductGrid } from '~/components/catalog/product-grid.js';
+import { WidgetArea } from '~/components/widgets/WidgetArea.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { gql } from '~/lib/graphql/client.js';
 import { CATEGORY_BY_URL_KEY_QUERY, type CategoryPageResponse } from '~/lib/graphql/queries/catalog.js';
+import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { imageUrl } from '~/lib/image.js';
 import { buildMeta, canonicalUrl } from '~/lib/seo.js';
+import { resolveWidgetExtras } from '~/lib/widgets/resolveWidgetExtras.js';
+
+// Matches `categoryView`'s legacy route id — this route is flagged
+// `editable: true` there (see catalog/pages/frontStore/categoryView/route.json)
+// and shows up in the page builder's route picker, but had no WidgetArea at
+// all to actually place anything into.
+const ROUTE_ID = 'categoryView';
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const urlKey = params.urlKey!;
   const page = new URL(request.url).searchParams.get('page') ?? '1';
+  const changeset = new URL(request.url).searchParams.get('changeset');
+  const cookie = request.headers.get('Cookie');
 
-  const result = await cached(`page:category:${urlKey}:${page}`, CACHE_TTL.page, () =>
-    gql<CategoryPageResponse>(CATEGORY_BY_URL_KEY_QUERY, { urlKey, page, limit: '24' })
-  );
+  const [result, widgetData] = await Promise.all([
+    cached(`page:category:${urlKey}:${page}`, CACHE_TTL.page, () =>
+      gql<CategoryPageResponse>(CATEGORY_BY_URL_KEY_QUERY, { urlKey, page, limit: '24' })
+    ),
+    gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: ROUTE_ID, changeset })
+  ]);
 
   if (!result.categoryByUrlKey) {
     throw data('Category not found', { status: 404 });
   }
 
-  return { category: result.categoryByUrlKey, canonical: canonicalUrl(request) };
+  const widgets = widgetData.widgetsForRoute;
+  const extras = await resolveWidgetExtras(widgets, cookie);
+
+  return { category: result.categoryByUrlKey, canonical: canonicalUrl(request), widgets, extras };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -35,7 +51,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function CategoryPage() {
-  const { category } = useLoaderData<typeof loader>();
+  const { category, widgets, extras } = useLoaderData<typeof loader>();
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
@@ -44,6 +60,7 @@ export default function CategoryPage() {
         <p className="text-sm text-muted-foreground">{category.products.total} products</p>
       </div>
       <ProductGrid products={category.products.items} />
+      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
     </div>
   );
 }

@@ -1,23 +1,39 @@
 import { data, Link, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
-
 import { JsonLd } from '~/components/content/json-ld.js';
 import { RichContent } from '~/components/content/rich-content.js';
+import { WidgetArea } from '~/components/widgets/WidgetArea.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { gql } from '~/lib/graphql/client.js';
 import { BLOG_POST_QUERY, type BlogPostDetailResponse } from '~/lib/graphql/queries/blog.js';
+import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { imageUrl } from '~/lib/image.js';
 import { buildMeta, canonicalUrl } from '~/lib/seo.js';
+import { resolveWidgetExtras } from '~/lib/widgets/resolveWidgetExtras.js';
+
+// Matches `blogPostView`'s legacy route id (`editable: true`). Route-level
+// only, same convention `productView`/`homepage` already use — not scoped
+// per-post, every blog post shows the same placed widgets.
+const ROUTE_ID = 'blogPostView';
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const urlKey = params.urlKey!;
-  const result = await cached(`data:blog-post:${urlKey}`, CACHE_TTL.data, () =>
-    gql<BlogPostDetailResponse>(BLOG_POST_QUERY, { urlKey })
-  );
+  const changeset = new URL(request.url).searchParams.get('changeset');
+  const cookie = request.headers.get('Cookie');
+
+  const [result, widgetData] = await Promise.all([
+    cached(`data:blog-post:${urlKey}`, CACHE_TTL.data, () => gql<BlogPostDetailResponse>(BLOG_POST_QUERY, { urlKey })),
+    gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: ROUTE_ID, changeset })
+  ]);
+
   if (!result.blogPostByUrlKey) {
     throw data('Post not found', { status: 404 });
   }
-  return { post: result.blogPostByUrlKey, canonical: canonicalUrl(request) };
+
+  const widgets = widgetData.widgetsForRoute;
+  const extras = await resolveWidgetExtras(widgets, cookie);
+
+  return { post: result.blogPostByUrlKey, canonical: canonicalUrl(request), widgets, extras };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -33,7 +49,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function BlogPostPage() {
-  const { post } = useLoaderData<typeof loader>();
+  const { post, widgets, extras } = useLoaderData<typeof loader>();
 
   return (
     <article className="mx-auto max-w-2xl space-y-6 px-4 py-8">
@@ -82,6 +98,7 @@ export default function BlogPostPage() {
           </div>
         </div>
       )}
+      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
     </article>
   );
 }

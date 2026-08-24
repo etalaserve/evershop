@@ -1,18 +1,31 @@
 import { Link, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
-
+import { WidgetArea } from '~/components/widgets/WidgetArea.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { gql } from '~/lib/graphql/client.js';
 import { BLOG_LIST_QUERY, type BlogListResponse } from '~/lib/graphql/queries/blog.js';
+import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { imageUrl } from '~/lib/image.js';
 import { buildMeta, canonicalUrl } from '~/lib/seo.js';
+import { resolveWidgetExtras } from '~/lib/widgets/resolveWidgetExtras.js';
+
+// Matches `blogHome`'s legacy route id (`editable: true`).
+const ROUTE_ID = 'blogHome';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const page = new URL(request.url).searchParams.get('page') ?? '1';
-  const result = await cached(`page:blog:${page}`, CACHE_TTL.page, () =>
-    gql<BlogListResponse>(BLOG_LIST_QUERY, { page })
-  );
-  return { posts: result.blogPosts.items, canonical: canonicalUrl(request) };
+  const changeset = new URL(request.url).searchParams.get('changeset');
+  const cookie = request.headers.get('Cookie');
+
+  const [result, widgetData] = await Promise.all([
+    cached(`page:blog:${page}`, CACHE_TTL.page, () => gql<BlogListResponse>(BLOG_LIST_QUERY, { page })),
+    gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: ROUTE_ID, changeset })
+  ]);
+
+  const widgets = widgetData.widgetsForRoute;
+  const extras = await resolveWidgetExtras(widgets, cookie);
+
+  return { posts: result.blogPosts.items, canonical: canonicalUrl(request), widgets, extras };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -21,7 +34,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function BlogIndex() {
-  const { posts } = useLoaderData<typeof loader>();
+  const { posts, widgets, extras } = useLoaderData<typeof loader>();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-8">
@@ -48,6 +61,7 @@ export default function BlogIndex() {
           </Link>
         ))}
       </div>
+      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
     </div>
   );
 }

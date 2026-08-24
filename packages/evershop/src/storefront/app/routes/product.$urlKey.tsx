@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { data, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
-
-import { ProductGrid } from '~/components/catalog/product-grid.js';
 import { JsonLd } from '~/components/content/json-ld.js';
 import { RichContent } from '~/components/content/rich-content.js';
 import { Badge } from '~/components/ui/badge.js';
@@ -195,13 +193,11 @@ export default function ProductPage() {
 
       <RichContent rows={product.description as any} />
 
-      {product.relatedProducts.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">You may also like</h2>
-          <ProductGrid products={product.relatedProducts.slice(0, 4)} />
-        </section>
-      )}
-
+      {/* "You may also like" used to be hardcoded JSX here, duplicating what
+          the `related_products` widget already does — removed in favor of a
+          route-level `related_products` widget seeded onto `productView` by
+          the catalog migration below, so every product page keeps the same
+          default behavior but it's now a real, editable/removable widget. */}
       <WidgetArea areaId="content" widgets={widgets} extras={extras} />
     </div>
   );
