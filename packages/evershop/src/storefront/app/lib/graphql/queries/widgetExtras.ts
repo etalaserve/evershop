@@ -1,5 +1,5 @@
-import { PRODUCT_CARD_FIELDS, type ProductCard } from './catalog.js';
 import { BLOG_POST_CARD_FIELDS, type BlogPostCard } from './blog.js';
+import { PRODUCT_CARD_FIELDS, type ProductCard } from './catalog.js';
 
 /**
  * Queries for the 6 "self-contained" recommendation widgets — their data
@@ -191,6 +191,56 @@ export interface ProductHeroWidgetResponse {
     imagePosition: string;
     product: ProductCard | null;
   } | null;
+}
+
+/**
+ * `latest_products`/`top_categories` — the two widget types that replaced
+ * the homepage's formerly-hardcoded "New arrivals" grid and top-level
+ * category tiles (see `_index.tsx`). Unlike the widgets above, these have
+ * no per-instance reference to resolve (no collection code, no picked
+ * product/post uuids) — they just read straight off the catalog, same
+ * queries the hardcoded JSX used to run inline. No backend GraphQL
+ * resolver needed: `products`/`categories` are existing root queries.
+ */
+export const LATEST_PRODUCTS_WIDGET_QUERY = /* GraphQL */ `
+  query LatestProductsWidget($count: ID) {
+    products(filters: [{ key: "limit", operation: eq, value: $count }]) {
+      items {
+        ${PRODUCT_CARD_FIELDS}
+      }
+    }
+  }
+`;
+export interface LatestProductsWidgetResponse {
+  products: { items: ProductCard[] };
+}
+
+export const TOP_CATEGORIES_WIDGET_QUERY = /* GraphQL */ `
+  query TopCategoriesWidget {
+    categories(filters: [{ key: "parent", operation: eq, value: null }]) {
+      items {
+        categoryId
+        uuid
+        name
+        urlKey
+        image {
+          url
+          alt
+        }
+      }
+    }
+  }
+`;
+export interface TopCategoriesWidgetResponse {
+  categories: {
+    items: Array<{
+      categoryId: number;
+      uuid: string;
+      name: string;
+      urlKey: string;
+      image: { url: string; alt: string | null } | null;
+    }>;
+  };
 }
 
 export const FEATURED_BLOGS_WIDGET_QUERY = /* GraphQL */ `

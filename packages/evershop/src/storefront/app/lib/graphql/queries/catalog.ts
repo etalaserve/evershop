@@ -63,41 +63,6 @@ export const PRODUCT_CARD_FIELDS = /* GraphQL */ `
  * vocabulary (price/name/qty/status — no date), and `parent: null` (not the
  * string "0") is how root categories are selected (`parent_id IS NULL`).
  */
-export const HOME_PAGE_QUERY = /* GraphQL */ `
-  query HomePage {
-    products(filters: [{ key: "limit", operation: eq, value: "8" }]) {
-      items {
-        ${PRODUCT_CARD_FIELDS}
-      }
-    }
-    categories(filters: [{ key: "parent", operation: eq, value: null }]) {
-      items {
-        categoryId
-        uuid
-        name
-        urlKey
-        image {
-          url
-          alt
-        }
-      }
-    }
-  }
-`;
-
-export interface HomePageResponse {
-  products: { items: ProductCard[] };
-  categories: {
-    items: Array<{
-      categoryId: number;
-      uuid: string;
-      name: string;
-      urlKey: string;
-      image: ProductImage | null;
-    }>;
-  };
-}
-
 export const CATEGORY_NAV_QUERY = /* GraphQL */ `
   query CategoryNav {
     categories(filters: [{ key: "parent", operation: eq, value: null }]) {

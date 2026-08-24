@@ -1,3 +1,4 @@
+import { flattenWidgets } from './flatten.js';
 import { gql } from '~/lib/graphql/client.js';
 import type { ProductCard } from '~/lib/graphql/queries/catalog.js';
 import {
@@ -6,16 +7,19 @@ import {
   COLLECTION_SPOTLIGHT_WIDGET_QUERY,
   COLLECTION_STACK_WIDGET_QUERY,
   FEATURED_BLOGS_WIDGET_QUERY,
+  LATEST_PRODUCTS_WIDGET_QUERY,
   PRODUCT_HERO_WIDGET_QUERY,
+  TOP_CATEGORIES_WIDGET_QUERY,
   type CartCrossSellResponse,
   type CollectionProductsWidgetResponse,
   type CollectionSpotlightWidgetResponse,
   type CollectionStackWidgetResponse,
   type FeaturedBlogsWidgetResponse,
-  type ProductHeroWidgetResponse
+  type LatestProductsWidgetResponse,
+  type ProductHeroWidgetResponse,
+  type TopCategoriesWidgetResponse
 } from '~/lib/graphql/queries/widgetExtras.js';
 import type { WidgetFragment } from '~/lib/graphql/queries/widgets.js';
-import { flattenWidgets } from './flatten.js';
 
 const SELF_CONTAINED_TYPES = new Set([
   'collection_products',
@@ -23,7 +27,9 @@ const SELF_CONTAINED_TYPES = new Set([
   'collection_spotlight',
   'product_hero',
   'featured_blogs',
-  'cart_frequently_bought_together'
+  'cart_frequently_bought_together',
+  'latest_products',
+  'top_categories'
 ]);
 
 /** Route id → widget type → extra resolved data, so `WidgetArea` can pass it into the matching component alongside `rawSettings`. */
@@ -128,6 +134,32 @@ export async function resolveWidgetExtras(widgets: WidgetFragment[], cookie: str
               columns: s.columns ?? 3
             });
             extras[widget.uuid] = res.featuredBlogsWidget;
+            break;
+          }
+          case 'latest_products': {
+            const res = await gql<LatestProductsWidgetResponse>(LATEST_PRODUCTS_WIDGET_QUERY, {
+              count: String(s.count ?? 8)
+            });
+            // Same extra shape `CollectionProducts` already reads (it backs
+            // both `collection_products` and this type) — `description` is
+            // always null here since there's no collection entity to source
+            // rich text from.
+            extras[widget.uuid] = {
+              heading: typeof s.heading === 'string' && s.heading ? s.heading : 'New arrivals',
+              subText: s.subText ?? null,
+              description: null,
+              viewAllLink: s.viewAllLink ?? null,
+              viewAllLabel: s.viewAllLabel ?? null,
+              products: res.products.items
+            };
+            break;
+          }
+          case 'top_categories': {
+            const res = await gql<TopCategoriesWidgetResponse>(TOP_CATEGORIES_WIDGET_QUERY);
+            extras[widget.uuid] = {
+              heading: s.heading ?? null,
+              categories: res.categories.items
+            };
             break;
           }
           default:

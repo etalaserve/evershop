@@ -1,3 +1,4 @@
+import { registerStorefrontWidget } from './registry.js';
 import { AnnouncementBar } from '~/components/widgets/AnnouncementBar.js';
 import { Banner } from '~/components/widgets/Banner.js';
 import { BasicMenu } from '~/components/widgets/BasicMenu.js';
@@ -20,9 +21,9 @@ import { SimpleSlider } from '~/components/widgets/SimpleSlider.js';
 import { SplitFeature } from '~/components/widgets/SplitFeature.js';
 import { TextBlock } from '~/components/widgets/TextBlock.js';
 import { TieredCategories } from '~/components/widgets/TieredCategories.js';
+import { TopCategories } from '~/components/widgets/TopCategories.js';
 import { TrustStrip } from '~/components/widgets/TrustStrip.js';
 
-import { registerStorefrontWidget } from './registry.js';
 
 /**
  * Side-effect registration, mirroring the legacy modules' `bootstrap.ts`
@@ -65,3 +66,8 @@ registerStorefrontWidget('collection_stack', CollectionStack);
 registerStorefrontWidget('collection_spotlight', CollectionSpotlight);
 registerStorefrontWidget('product_hero', ProductHero);
 registerStorefrontWidget('featured_blogs', FeaturedBlogs);
+// `latest_products` reuses `CollectionProducts`'s render — same extra shape
+// (`heading`/`subText`/`description`/`viewAllLink`/`viewAllLabel`/`products`),
+// just resolved without a collection reference (see resolveWidgetExtras.ts).
+registerStorefrontWidget('latest_products', CollectionProducts);
+registerStorefrontWidget('top_categories', TopCategories);

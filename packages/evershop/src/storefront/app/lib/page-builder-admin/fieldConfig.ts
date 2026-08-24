@@ -431,5 +431,17 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
     { key: 'count', label: 'Max posts', type: 'number', min: 1, max: 24 },
     { key: 'columns', label: 'Columns', type: 'number', min: 1, max: 4 },
     { key: 'postUuids', label: 'Picked post UUIDs (JSON array)', type: 'json' }
-  ]
+  ],
+
+  latest_products: [
+    { key: 'variant', label: 'Style', type: 'select', options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }] },
+    { key: 'heading', label: 'Heading', type: 'text' },
+    { key: 'count', label: 'Product count', type: 'number', min: 1, max: 48 },
+    { key: 'countPerRow', label: 'Columns', type: 'number', min: 1, max: 6 },
+    { key: 'subText', label: 'Subtext', type: 'text' },
+    { key: 'viewAllLink', label: '"View all" link', type: 'text' },
+    { key: 'viewAllLabel', label: '"View all" label', type: 'text' }
+  ],
+
+  top_categories: [{ key: 'heading', label: 'Heading', type: 'text' }]
 };

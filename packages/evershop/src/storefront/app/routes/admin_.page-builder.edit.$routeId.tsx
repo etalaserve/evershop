@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { data, redirect, useLoaderData, useRevalidator } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-
+import type { AppLoadContext } from '../../../bin/lib/createStorefrontMiddleware.js';
 import { Canvas } from '~/components/page-builder-admin/Canvas.js';
 import { DiscardConfirmDialog } from '~/components/page-builder-admin/DiscardConfirmDialog.js';
 import { Layers } from '~/components/page-builder-admin/Layers.js';
@@ -13,8 +13,9 @@ import { SettingsDrawer, type SelectedWidget } from '~/components/page-builder-a
 import { ThemeSheet } from '~/components/page-builder-admin/ThemeSheet.js';
 import { Topbar, type DeviceMode } from '~/components/page-builder-admin/Topbar.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs.js';
-import { gql } from '~/lib/graphql/client.js';
+import { getCurrentAdminUser } from '~/lib/admin/session.js';
 import { gqlAdmin } from '~/lib/graphql/admin-client.js';
+import { gql } from '~/lib/graphql/client.js';
 import {
   CHANGESET_STATE_QUERY,
   ROLLOUT_PLAN_SESSION_QUERY,
@@ -25,14 +26,12 @@ import {
 } from '~/lib/graphql/queries/page-builder-admin.js';
 import { STORE_SETTINGS_QUERY, type StoreSettingsResponse } from '~/lib/graphql/queries/settings.js';
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetFragment, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
-import { getCurrentAdminUser } from '~/lib/admin/session.js';
 import { pageBuilderApi } from '~/lib/page-builder-admin/api.js';
 import { getOrCreateDraft } from '~/lib/page-builder-admin/changeset.js';
 import { buildAddWidgetOps, buildDeleteOps, buildMoveOp, buildUpdateSettingsOp } from '~/lib/page-builder-admin/operations.js';
 import { findPlacement, flattenWidgets } from '~/lib/page-builder-admin/widgetLookup.js';
 import { paletteEntry, shuffleCandidates } from '~/lib/page-builder-admin/widgetPalette.js';
 import { resolveThemeTokens } from '~/lib/theme/tokens.js';
-import type { AppLoadContext } from '../../../bin/lib/createStorefrontMiddleware.js';
 
 const DEFAULT_AREA = 'content';
 const DEVICE_WIDTH: Record<DeviceMode, string> = { desktop: '100%', tablet: '768px', mobile: '375px' };
@@ -385,7 +384,11 @@ export default function PageBuilderEditor() {
               <TabsTrigger value="layers">Layers</TabsTrigger>
             </TabsList>
             <TabsContent value="widgets">
-              <Palette onAddClick={handleAddFromPalette} />
+              <Palette
+                onAddClick={handleAddFromPalette}
+                onDragStart={() => postToCanvas({ type: 'pb-drag-start' })}
+                onDragEnd={() => postToCanvas({ type: 'pb-drag-end' })}
+              />
             </TabsContent>
             <TabsContent value="layers">
               <Layers

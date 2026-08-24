@@ -148,6 +148,27 @@ export const WIDGET_PALETTE: PaletteEntry[] = [
     label: 'Featured blogs — Carousel',
     category: 'commerce',
     defaultSettings: { eyebrow: '', heading: '', subText: '', postUuids: [], count: 6, columns: 3, variant: 'carousel' }
+  },
+  {
+    type: 'latest_products',
+    variantId: 'latest_products:grid',
+    label: 'Latest products — Grid',
+    category: 'commerce',
+    defaultSettings: { heading: 'New arrivals', subText: null, count: 8, countPerRow: 4, viewAllLink: null, viewAllLabel: null, variant: 'grid' }
+  },
+  {
+    type: 'latest_products',
+    variantId: 'latest_products:carousel',
+    label: 'Latest products — Carousel',
+    category: 'commerce',
+    defaultSettings: { heading: 'New arrivals', subText: null, count: 8, countPerRow: 4, viewAllLink: null, viewAllLabel: null, variant: 'carousel' }
+  },
+  {
+    type: 'top_categories',
+    variantId: 'top_categories:default',
+    label: 'Top categories',
+    category: 'navigation',
+    defaultSettings: { heading: null }
   }
 ];
 

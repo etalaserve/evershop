@@ -1,6 +1,5 @@
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-
 import { Card } from '~/components/ui/card.js';
 import { Input } from '~/components/ui/input.js';
 import { WIDGET_PALETTE, type PaletteEntry } from '~/lib/page-builder-admin/widgetPalette.js';
@@ -23,7 +22,20 @@ const CATEGORY_LABELS: Record<PaletteEntry['category'], string> = {
  * unused by the UI until now) and filterable by a search box, matching the
  * reference product's block-picker UX.
  */
-export function Palette({ onAddClick }: { onAddClick: (variantId: string) => void }) {
+export function Palette({
+  onAddClick,
+  onDragStart,
+  onDragEnd
+}: {
+  onAddClick: (variantId: string) => void;
+  /** Fired on drag start/end so the caller can toggle the canvas iframe's
+      `pb-drag-start`/`pb-drag-end` bridge messages — the drop zones inside
+      the iframe are `pointer-events: none` until that message arrives (see
+      `WidgetChrome.tsx`'s CHROME_CSS), so without this the drag never hits
+      a drop target at all. */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}) {
   const [query, setQuery] = useState('');
 
   const grouped = useMemo(() => {
@@ -64,7 +76,9 @@ export function Palette({ onAddClick }: { onAddClick: (variantId: string) => voi
                   e.dataTransfer.setData('application/x-evershop-widget', entry.variantId);
                   e.dataTransfer.setData('text/plain', entry.variantId);
                   e.dataTransfer.effectAllowed = 'copy';
+                  onDragStart?.();
                 }}
+                onDragEnd={() => onDragEnd?.()}
                 onClick={() => onAddClick(entry.variantId)}
                 className="cursor-grab select-none px-3 py-2 text-sm hover:bg-accent active:cursor-grabbing"
                 title="Drag onto the page, or click to add to the end"
