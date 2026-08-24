@@ -249,6 +249,25 @@ export function handleSummary(data) {
   const dropped = data.metrics.dropped_iterations?.values?.count ?? 0;
   text += `dropped iterations : ${dropped}${dropped ? '  <-- GENERATOR SATURATED, run is invalid' : ''}\n`;
 
+  // Returning only the ratio table would throw away every standard metric.
+  // k6's own textSummary lives in a remote jslib module, and a network
+  // dependency that is only consulted at the very end of a long run is
+  // exactly the failure mode the directory bug already demonstrated — so the
+  // handful of numbers worth having are formatted here instead.
+  const dur = data.metrics.http_req_duration?.values ?? {};
+  const reqs = data.metrics.http_reqs?.values ?? {};
+  const iters = data.metrics.iterations?.values ?? {};
+  text += '\n=== Throughput and latency (all requests) ===\n';
+  text += `requests           : ${reqs.count ?? 0} (${(reqs.rate ?? 0).toFixed(1)}/s)\n`;
+  text += `iterations         : ${iters.count ?? 0}\n`;
+  text += `latency p50/p95    : ${fmt(dur.med ?? null)}ms / ${fmt(dur['p(95)'] ?? null)}ms\n`;
+  text += `latency avg/max    : ${fmt(dur.avg ?? null)}ms / ${fmt(dur.max ?? null)}ms\n`;
+
+  const checks = data.metrics.checks?.values;
+  if (checks) {
+    text += `checks passed      : ${checks.passes ?? 0}/${(checks.passes ?? 0) + (checks.fails ?? 0)}\n`;
+  }
+
   // Flat filenames, not a per-run directory: k6 writes summary files but does
   // not create directories for them, so a nested path silently fails at the
   // very end of a long run. The timestamp is in the filename instead, and
