@@ -54,7 +54,13 @@ export interface RouteEntry {
 /** Flat-routes filename -> URL pattern. */
 export function fileToPattern(file: string): string | null {
   let name = file.replace(/\.tsx?$/, '');
-  if (name.startsWith('_')) return null; // pathless layout (e.g. _index handled below)
+  if (name === '_index') return '/'; // the root route — the one bare "_index" file
+  // Any OTHER leading underscore is a pathless layout wrapper (contributes no
+  // URL segment of its own, only a shared layout for its children) — those
+  // aren't independently visitable, so skip them. This must come after the
+  // exact "_index" check above: that name also starts with "_" and is the
+  // one leading-underscore file that IS a real, visitable route.
+  if (name.startsWith('_')) return null;
   if (name.endsWith('.css')) return null;
 
   // Split on separator dots only. A dot inside [] is an escaped literal —

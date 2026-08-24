@@ -65,7 +65,15 @@ export function AppSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar> & { user: { name: string; email: string } }) {
   return (
-    <Sidebar collapsible="none" {...props}>
+    // "icon" (not "none") is what lets the Sidebar component's own
+    // useIsMobile() branch run at all — collapsible="none" short-circuits
+    // before that check and unconditionally renders the fixed-width desktop
+    // markup, which is why this stayed full-width and half-covered a 390px
+    // viewport rather than becoming the off-canvas Sheet. There's still no
+    // way to collapse it on desktop (no trigger is rendered there, so
+    // `state` never leaves "expanded"), which is what "not collapsible" was
+    // actually asking for — it just also needs to work on a phone.
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
