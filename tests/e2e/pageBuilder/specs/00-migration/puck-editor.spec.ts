@@ -67,7 +67,7 @@ test.describe('puck editor', () => {
   test.setTimeout(240_000);
 
   test.afterEach(async () => {
-    await discardAdminChangesets();
+    await discardAdminChangesets(adminUserId());
     await getDb().query(`DELETE FROM puck_document WHERE route = $1`, [ROUTE_ID]);
   });
 

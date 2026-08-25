@@ -150,6 +150,36 @@ function normalize(html: string): string {
   return main ? main[0] : body;
 }
 
+
+/**
+ * Report the FIRST point where the two renders diverge, with surrounding
+ * context, instead of dumping two multi-kilobyte strings.
+ *
+ * Whole-document equality is the right assertion, but its default failure
+ * output is two walls of HTML that have to be diffed by eye — which is how a
+ * genuine difference gets mistaken for noise. Naming the offset and showing a
+ * window around it makes an intermittent failure diagnosable from the log
+ * alone, without reproducing it.
+ */
+function assertSameRender(actual: string, expected: string): void {
+  if (actual === expected) return;
+
+  let i = 0;
+  while (i < actual.length && i < expected.length && actual[i] === expected[i]) i++;
+  const from = Math.max(0, i - 120);
+  const window = 240;
+
+  throw new Error(
+    [
+      `Renders diverge at offset ${i} (widget ${expected.length} bytes, puck ${actual.length} bytes).`,
+      `--- widget pipeline ---`,
+      expected.slice(from, from + window),
+      `--- puck pipeline ---`,
+      actual.slice(from, from + window)
+    ].join('\n')
+  );
+}
+
 test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
   for (const route of ROUTES) {
     test(`${route.routeId}: both engines render identical HTML`, async ({
@@ -226,7 +256,7 @@ test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
           'var eContext'
         );
         expect(puckHtml).not.toContain('var eContext');
-        expect(puckHtml).toBe(widgetHtml);
+        assertSameRender(puckHtml, widgetHtml);
       } finally {
         // Leave the store exactly as found. Widget placements go with the
         // instance (ON DELETE CASCADE); documents are restored from the
