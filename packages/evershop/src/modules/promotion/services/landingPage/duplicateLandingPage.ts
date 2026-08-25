@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   commit,
   insert,
@@ -12,6 +13,7 @@ import {
   hookBefore,
   hookAfter
 } from '../../../../lib/util/hookable.js';
+import { remapColumnAreaParent } from '../../../../lib/widget/columnArea.js';
 import { syncLandingPageUrlRewrite } from './syncLandingPageUrlRewrite.js';
 
 /** Find a free `<base>-copy[-N]` url_key (the landing_page.url_key is UNIQUE). */
@@ -78,16 +80,23 @@ async function duplicateLandingPageData(
     ...new Set(placements.map((p: any) => p.widget_instance_id))
   ];
   const idMap = new Map<number, number>();
+  // Container children encode their parent by UUID in `area`
+  // (`columnsContainer_<parentUuid>_col_<n>`), so cloning also needs an
+  // old-uuid → new-uuid map. The new uuid is minted here rather than left to
+  // the column default so it is known before the placements are written.
+  const uuidMap = new Map<string, string>();
   for (const oldId of instanceIds) {
-     
+
     const wi = await select()
       .from('widget_instance')
       .where('widget_instance_id', '=', oldId)
       .load(connection);
     if (!wi) continue;
-     
+    const newUuid = randomUUID();
+
     const newWi = await insert('widget_instance')
       .given({
+        uuid: newUuid,
         name: wi.name,
         type: wi.type,
         settings: wi.settings,
@@ -96,17 +105,23 @@ async function duplicateLandingPageData(
       })
       .execute(connection);
     idMap.set(oldId as number, newWi.widget_instance_id);
+    uuidMap.set(wi.uuid as string, newUuid);
   }
 
   for (const p of placements) {
     const newInstanceId = idMap.get(p.widget_instance_id);
     if (!newInstanceId) continue;
-     
+
     await insert('widget_placement')
       .given({
         widget_instance_id: newInstanceId,
         route: p.route,
-        area: p.area,
+        // Repoint nested children at the CLONED container. Copying `area`
+        // verbatim left them addressed to the source page's container uuid,
+        // so a duplicated page silently lost the contents of every Columns /
+        // Section widget — the children were written but nothing rendered
+        // them, because `findWidgetsInArea` matches on this exact string.
+        area: remapColumnAreaParent(p.area, uuidMap),
         sort_order: p.sort_order,
         theme: p.theme,
         entity_urn: newUrn
