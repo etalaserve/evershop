@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../shared/test.js';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../../../shared/db.js';
 import { runThemeCli } from '../../../shared/themeCli.js';

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../../../shared/test.js';
 import {
   cleanupShippingWorld,
   FLAT_COST,

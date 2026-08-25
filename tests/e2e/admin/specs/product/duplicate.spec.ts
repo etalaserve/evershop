@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../shared/test.js';
 import { getDb } from '../../../shared/db.js';
 import {
   cleanupDuplicationArtifacts,

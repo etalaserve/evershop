@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator } from '../../../shared/test.js';
 import {
   cleanupRecoWorld,
   createRecoWorld,

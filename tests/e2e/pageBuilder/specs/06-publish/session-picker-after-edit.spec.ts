@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../shared/test.js';
 import { getActiveChangesetId } from '../../../shared/changesetDb.js';
 import { loadAdminUserId } from '../../../shared/adminMeta.js';
 import { discardAdminChangesets, getDb } from '../../../shared/db.js';
