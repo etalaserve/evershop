@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
@@ -10,6 +11,19 @@ export default defineConfig({
   // now or after the legacy pipeline is removed.
   base: '/storefront-assets/',
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  optimizeDeps: {
+    // `sanitize-html` (used client-side by `RichContent`, not just SSR) pulls
+    // in `postcss` for style-attribute sanitization, and one of postcss's
+    // files references the bare `Buffer` global with a pattern written for
+    // bundlers that used to auto-shim it (webpack ≤4) — Vite doesn't, so it
+    // throws "Buffer is not defined" the moment that code path actually
+    // runs (sanitizing a `style="..."` attribute). esbuild's `inject` makes
+    // every dependency it pre-bundles for the client see `Buffer` as if it
+    // were declared in scope, via the shim's re-export. See buffer-shim.ts.
+    esbuildOptions: {
+      inject: [fileURLToPath(new URL('./app/lib/polyfills/buffer-shim.ts', import.meta.url))]
+    }
+  },
   server: {
     // Vite's dev server transforms each ES module on first request, not
     // ahead of time — normally invisible because requests spread out over a
