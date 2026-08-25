@@ -13,6 +13,16 @@ import { insertRolloutPlanDirect, seedWidgetPlacement } from '../../../shared/pb
 import { EditorPage } from '../../pages/EditorPage.js';
 import { RolloutDialogPage } from '../../pages/RolloutDialog.js';
 
+// PENDING PUCK REWRITE — plan Phase 4.
+//
+// This spec drives the LEGACY editor's DOM (`.page-builder-editor > header`,
+// see shared/selectors.ts). Only pageBuilderEdit/Editor.tsx renders that
+// markup — the RRv7 editor this spec navigates to renders none of it, so it
+// has been asserting against a pipeline it no longer reaches. Puck replaces
+// that DOM again, so this is rewritten once, against Puck, rather than twice.
+// Kept rather than deleted: it is the intent spec for that rewrite.
+test.skip(true, 'Pending rewrite against the Puck editor (plan Phase 4)');
+
 /**
  * Rollout-plan flow. The dialog covers create + validation + overlap; the
  * time-window spec bypasses the UI and inserts a rollout directly so we
