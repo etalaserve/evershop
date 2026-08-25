@@ -9,6 +9,7 @@ import { CMS_PAGE_QUERY, type CmsPageResponse } from '~/lib/graphql/queries/cms.
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { buildMeta, canonicalUrl } from '~/lib/seo.js';
 import { loadPuckDocument } from '~/lib/puck/loadPuckDocument.js';
+import { prepareDocumentForRender } from '~/lib/puck/prepareDocument.js';
 import { resolveWidgetExtras } from '~/lib/widgets/resolveWidgetExtras.js';
 
 // Matches `cmsPageView`'s legacy route id (`editable: true`) — route-level,
@@ -51,17 +52,20 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
    * content with no commerce extras, which isolates the config generator and
    * the converter from the data-resolution work that comes in Phase 3.
    */
-  const puckDocument =
+  const stored =
     url.searchParams.get('__engine') === 'puck'
       ? await loadPuckDocument(ROUTE_ID)
       : null;
+  const puck = stored
+    ? await prepareDocumentForRender(stored, { routeId: ROUTE_ID, cookie })
+    : null;
 
   return {
     page: result.cmsPageByUrlKey,
     canonical: canonicalUrl(request),
     widgets,
     extras,
-    puckDocument
+    puck
   };
 }
 
@@ -72,7 +76,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function CmsPage() {
-  const { page, widgets, extras, puckDocument } = useLoaderData<typeof loader>();
+  const { page, widgets, extras, puck } = useLoaderData<typeof loader>();
 
   return (
     <article className="mx-auto max-w-2xl space-y-6 px-4 py-8">
@@ -80,8 +84,8 @@ export default function CmsPage() {
       <RichContent rows={page.content as any} />
       {/* See the loader: `?__engine=puck` is temporary migration scaffolding.
           Falls back to the widget pipeline when no document exists. */}
-      {puckDocument ? (
-        <PuckArea data={puckDocument} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
       ) : (
         <WidgetArea areaId="content" widgets={widgets} extras={extras} />
       )}

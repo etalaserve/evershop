@@ -1,9 +1,10 @@
-import type React from 'react';
+import React from 'react';
+import { WidgetBoundary } from '~/components/widgets/WidgetBoundary.js';
 import {
   nestFlatFields,
   type CustomFieldRenderers,
   type PuckField
-} from '../../../lib/puck/buildFields.js';
+} from '../../../../lib/puck/buildFields.js';
 import { WIDGET_FIELD_CONFIGS } from '~/lib/page-builder-admin/fieldConfig.js';
 import { WIDGET_PALETTE } from '~/lib/page-builder-admin/widgetPalette.js';
 import { getStorefrontWidget } from '~/lib/widgets/registry.js';
@@ -147,7 +148,7 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
           }
         }
 
-        return (Component as unknown as (p: unknown) => unknown)({
+        const widgetProps = {
           widget: {
             uuid: id,
             type,
@@ -162,7 +163,20 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
           extra: extras[id],
           extras,
           ...(Object.keys(slots).length > 0 ? { slots } : {})
-        });
+        };
+
+        // `createElement` rather than calling `Component(...)` directly: a
+        // direct call executes the component body HERE, so anything it throws
+        // escapes before the boundary element exists and the boundary can
+        // never catch it. As a child element the component renders inside the
+        // boundary, which is what makes the per-widget isolation real. It also
+        // gives each widget its own component identity, so its hooks and state
+        // belong to it rather than to this bridge.
+        return React.createElement(
+          WidgetBoundary,
+          { type, id },
+          React.createElement(Component as React.ComponentType<never>, widgetProps as never)
+        );
       }
     };
   }

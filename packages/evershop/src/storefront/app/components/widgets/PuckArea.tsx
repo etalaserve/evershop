@@ -3,6 +3,7 @@ import { Render } from '@puckeditor/core/rsc';
 
 import { buildPuckConfig } from '~/lib/puck/buildPuckConfig.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
+import type { PuckMetadata } from '~/lib/puck/metadata.js';
 
 /**
  * Renders a Puck document — the `WidgetArea` counterpart for the Puck engine.
@@ -25,13 +26,17 @@ import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
  */
 export function PuckArea({
   data,
-  extras,
+  metadata,
   areaId = 'content',
   isGlobal = false
 }: {
   data: PuckDocumentData;
-  /** Server-resolved data for commerce widgets, keyed by component id. */
-  extras?: Record<string, unknown>;
+  /**
+   * The loader-built render context — extras, page context, mode. Built by
+   * `prepareDocumentForRender`, passed straight through to every component
+   * (including nested slot children) as `props.puck.metadata`.
+   */
+  metadata: PuckMetadata;
   areaId?: string;
   isGlobal?: boolean;
 }): React.ReactElement {
@@ -53,7 +58,7 @@ export function PuckArea({
     React.createElement(Render as never, {
       config: buildPuckConfig() as never,
       data: data as never,
-      metadata: { extras: extras ?? {} }
+      metadata: metadata as never
     })
   );
 }
