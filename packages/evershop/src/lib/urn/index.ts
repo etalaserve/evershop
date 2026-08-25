@@ -28,6 +28,11 @@ import { UrnService } from './services/UrnService.js';
     type: 'widget_placement',
     description: 'Widget placement on a route + area'
   },
+  {
+    service: 'cms',
+    type: 'puck_document',
+    description: 'Page builder document (one Puck Data per route + scope)'
+  },
   { service: 'cms', type: 'page', description: 'CMS page' },
   { service: 'oms', type: 'order', description: 'Customer order' },
   { service: 'customer', type: 'customer', description: 'Customer account' },
@@ -51,6 +56,8 @@ export const CmsUrn = {
     UrnService.build('cms', 'widget_instance', uuid),
   widgetPlacement: (uuid: string) =>
     UrnService.build('cms', 'widget_placement', uuid),
+  puckDocument: (uuid: string) =>
+    UrnService.build('cms', 'puck_document', uuid),
   page: (uuid: string) => UrnService.build('cms', 'page', uuid)
 };
 

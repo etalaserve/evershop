@@ -61,6 +61,7 @@ import type {
   VariantGroupRow,
   WidgetInstanceRow,
   WidgetPlacementRow,
+  PuckDocumentRow,
   ChangesetRow,
   ChangesetOperationRow,
   RolloutPlanRow
@@ -120,6 +121,7 @@ export type TableName =
   | 'variant_group'
   | 'widget_instance'
   | 'widget_placement'
+  | 'puck_document'
   | 'changeset'
   | 'changeset_operation'
   | 'rollout_plan';
@@ -178,6 +180,7 @@ type TableColumnMap = {
   variant_group: keyof VariantGroupRow;
   widget_instance: keyof WidgetInstanceRow;
   widget_placement: keyof WidgetPlacementRow;
+  puck_document: keyof PuckDocumentRow;
   changeset: keyof ChangesetRow;
   changeset_operation: keyof ChangesetOperationRow;
   rollout_plan: keyof RolloutPlanRow;
@@ -244,6 +247,7 @@ type TableRowMap = {
   variant_group: VariantGroupRow;
   widget_instance: WidgetInstanceRow;
   widget_placement: WidgetPlacementRow;
+  puck_document: PuckDocumentRow;
   changeset: ChangesetRow;
   changeset_operation: ChangesetOperationRow;
   rollout_plan: RolloutPlanRow;

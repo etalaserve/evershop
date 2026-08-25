@@ -152,7 +152,8 @@ export default async (
     const parsedUrn = UrnService.parse(entityUrn as string);
     const URN_TABLE: Record<string, string> = {
       'cms:widget_instance': 'widget_instance',
-      'cms:widget_placement': 'widget_placement'
+      'cms:widget_placement': 'widget_placement',
+      'cms:puck_document': 'puck_document'
     };
     const targetTable = URN_TABLE[`${parsedUrn.service}:${parsedUrn.type}`];
 

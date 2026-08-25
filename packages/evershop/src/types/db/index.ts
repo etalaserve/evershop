@@ -1274,6 +1274,35 @@ export interface WidgetPlacementRow {
   updated_at: Date;
 }
 
+/**
+ * One Puck `Data` document per (route, scope, theme) — the Puck migration's
+ * replacement for the widget_instance/widget_placement pair. See
+ * `modules/pageBuilder/migration/Version-2.0.0.ts` for why `scope_urn` is
+ * named separately from `changeset_operation.entity_urn`.
+ */
+export interface PuckDocumentRow {
+  puck_document_id: number;
+  uuid: string;
+  route: string;
+  // scope_urn: nullable. Set for entity-scoped documents (e.g. one specific
+  // landing page). Null for the route-level document.
+  scope_urn: string | null;
+  // theme: nullable, and NULL is its own bucket meaning "no custom theme".
+  // Always compared with IS NOT DISTINCT FROM.
+  theme: string | null;
+  data: unknown;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type PuckDocumentInsert = Omit<
+  PuckDocumentRow,
+  'puck_document_id' | 'created_at' | 'updated_at'
+>;
+export type PuckDocumentUpdate = Partial<
+  Omit<PuckDocumentRow, 'puck_document_id'>
+>;
+
 export type WidgetPlacementInsert = Omit<
   WidgetPlacementRow,
   'widget_placement_id' | 'uuid' | 'created_at' | 'updated_at'

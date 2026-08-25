@@ -58,7 +58,7 @@ async function resolveWidgetInstanceIdByUuid(
  * mismatch throws so the publish transaction rolls back atomically.
  */
 async function assertRowThemeMatches(
-  table: 'widget_instance' | 'widget_placement',
+  table: 'widget_instance' | 'widget_placement' | 'puck_document',
   uuid: string,
   changesetTheme: string | null,
   conn: PoolClient
@@ -201,9 +201,74 @@ async function applyWidgetPlacementOp(
 }
 
 /**
+ * Apply a `cms:puck_document` op.
+ *
+ * Payloads are whole-`Data` snapshots, not patches:
+ *   `{ route, scope_urn, data }`.
+ *
+ * That choice is what keeps the rest of the changeset machinery untouched.
+ * `inferOpType` still reads (null, doc) = INSERT, (doc, doc) = UPDATE,
+ * (doc, null) = DELETE with no changes, and — unlike the widget branches,
+ * which each need a hand-rolled `SELECT 1 … LIMIT 1` probe so a re-publish
+ * doesn't abort the whole transaction on a uuid collision — INSERT is
+ * naturally idempotent here: the upsert targets `puck_document_unique`, so
+ * re-applying an op simply rewrites the same document with the same content.
+ *
+ * Theme handling mirrors the widget branches exactly: stamped from the
+ * changeset on INSERT, stripped on UPDATE (immutable per row), and verified
+ * against the target before UPDATE/DELETE.
+ */
+async function applyPuckDocumentOp(
+  opType: OpType,
+  uuid: string,
+  op: ChangesetOperationRow,
+  conn: PoolClient,
+  changesetTheme: string | null
+): Promise<void> {
+  if (opType === 'INSERT') {
+    const payload: any = { ...(op.new_payload as any) };
+    // The op's own uuid is the identity — never trust a uuid inside the payload.
+    payload.uuid = uuid;
+    payload.theme = changesetTheme;
+    await conn.query(
+      `INSERT INTO puck_document (uuid, route, scope_urn, theme, data)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (route, COALESCE(scope_urn, ''), COALESCE(theme, ''))
+       DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+      [
+        payload.uuid,
+        payload.route,
+        payload.scope_urn ?? null,
+        payload.theme ?? null,
+        JSON.stringify(payload.data ?? { content: [], root: { props: {} } })
+      ]
+    );
+    return;
+  }
+  if (opType === 'UPDATE') {
+    await assertRowThemeMatches('puck_document', uuid, changesetTheme, conn);
+    const payload: any = { ...(op.new_payload as any) };
+    // Only the document body is mutable. Identity, placement and theme are
+    // structural: a document that needs a different route or scope is a
+    // different document.
+    await conn.query(
+      `UPDATE puck_document SET data = $1, updated_at = NOW() WHERE uuid = $2`,
+      [
+        JSON.stringify(payload.data ?? { content: [], root: { props: {} } }),
+        uuid
+      ]
+    );
+    return;
+  }
+  // DELETE
+  await assertRowThemeMatches('puck_document', uuid, changesetTheme, conn);
+  await del('puck_document').where('uuid', '=', uuid).execute(conn);
+}
+
+/**
  * Apply one operation to the source tables. Throws if the operation targets
- * an unsupported URN type (only `cms:widget_instance` and `cms:widget_placement`
- * are supported in Phase 3a).
+ * an unsupported URN type (`cms:widget_instance`, `cms:widget_placement` and
+ * `cms:puck_document`).
  *
  * `changesetTheme` is the publishing changeset's theme: it is stamped onto
  * inserted rows and verified against the target of UPDATE/DELETE ops
@@ -223,8 +288,11 @@ export async function applyOperationToSource(
   if (parts.service === 'cms' && parts.type === 'widget_placement') {
     return applyWidgetPlacementOp(opType, parts.uuid, op, conn, changesetTheme);
   }
+  if (parts.service === 'cms' && parts.type === 'puck_document') {
+    return applyPuckDocumentOp(opType, parts.uuid, op, conn, changesetTheme);
+  }
   throw new Error(
     `Unsupported changeset op target: ${parts.service}:${parts.type}. ` +
-      `Phase 3a only supports cms:widget_instance and cms:widget_placement.`
+      `Supported: cms:widget_instance, cms:widget_placement, cms:puck_document.`
   );
 }
