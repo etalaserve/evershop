@@ -115,22 +115,37 @@ function computeOverlayColumns(
  * rather than the published `widget_placement` table.
  */
 async function buildOverlayedWidgetMaps(pool, changeset) {
+  // Theme isolation (spec 04 § 9.2) — must match `loadStorefrontWidgets`
+  // (services/widget/loadWidgetInstances.js) exactly, or these admin
+  // surfaces diverge from what the canvas actually renders: without the
+  // predicate the Layers panel lists widgets belonging to a dormant theme
+  // that the iframe will never draw. IS NOT DISTINCT FROM treats NULL =
+  // NULL as equality, so one parameterized predicate covers both the
+  // named-theme and the no-custom-theme (NULL) buckets.
+  const activeTheme = getActiveTheme();
+
   const widgetRows = await pool.query(
     `SELECT widget_instance_id, uuid, name, type, settings, status,
             created_at, updated_at
-     FROM widget_instance`
+     FROM widget_instance
+     WHERE theme IS NOT DISTINCT FROM $1`,
+    [activeTheme]
   );
   const widgetMap = new Map();
   for (const row of widgetRows.rows) {
     widgetMap.set(row.uuid, row);
   }
 
+  // Filter on the denormalized `p.theme` rather than the joined instance's,
+  // same as the storefront path — the composite (theme, route) index covers it.
   const placementRows = await pool.query(
     `SELECT p.widget_placement_id, p.uuid, p.route, p.area, p.sort_order,
             p.entity_urn, wi.uuid AS widget_instance_uuid
      FROM widget_placement p
      INNER JOIN widget_instance wi
-             ON wi.widget_instance_id = p.widget_instance_id`
+             ON wi.widget_instance_id = p.widget_instance_id
+     WHERE p.theme IS NOT DISTINCT FROM $1`,
+    [activeTheme]
   );
   const placementMap = new Map();
   for (const row of placementRows.rows) {
@@ -144,7 +159,6 @@ async function buildOverlayedWidgetMaps(pool, changeset) {
     const { ops, changesetTheme } = await loadActiveOps({
       previewChangesetToken: changeset
     });
-    const activeTheme = getActiveTheme();
     if (
       (changesetTheme === undefined || changesetTheme === activeTheme) &&
       ops.length > 0
