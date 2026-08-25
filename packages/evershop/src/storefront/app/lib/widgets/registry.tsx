@@ -1,5 +1,4 @@
 import React from 'react';
-
 import type { WidgetFragment } from '~/lib/graphql/queries/widgets.js';
 
 export interface WidgetComponentProps {
@@ -14,6 +13,21 @@ export interface WidgetComponentProps {
   extra?: unknown;
   /** The full uuid-keyed extras map — only container widgets (Columns/Section) need this, to pass down into their nested `WidgetArea`. */
   extras?: Record<string, unknown>;
+  /**
+   * Pre-rendered children per column index, supplied ONLY when the component
+   * is rendered by Puck.
+   *
+   * The widget pipeline nests children via `widget.columns[i].widgets` and a
+   * nested `<WidgetArea>` keyed on the synthetic
+   * `columnsContainer_<uuid>_col_<i>` area. Puck nests them as slot props
+   * instead, and hands `render()` a component per slot rather than data. A
+   * container therefore has to render whichever it was given — without this,
+   * a Puck-rendered Columns would silently produce empty columns, since
+   * `widget.columns` is `[]` under Puck.
+   *
+   * Undefined in the widget pipeline, so that path is unchanged.
+   */
+  slots?: Record<number, React.ComponentType>;
 }
 
 export type WidgetComponent = React.ComponentType<WidgetComponentProps>;

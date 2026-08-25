@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react';
-
 import { WidgetArea } from './WidgetArea.js';
 import { imageUrl } from '~/lib/image.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
@@ -20,7 +19,7 @@ const WIDTH_CLASS: Record<SectionWidth, string> = {
   boxed: 'relative w-full max-w-[1200px] mx-auto'
 };
 
-export function Section({ widget, extras }: WidgetComponentProps) {
+export function Section({ widget, extras, slots }: WidgetComponentProps) {
   const s = widget.rawSettings as {
     width?: SectionWidth;
     padding?: string;
@@ -54,7 +53,17 @@ export function Section({ widget, extras }: WidgetComponentProps) {
         <div aria-hidden="true" className="absolute inset-0" style={scrimStyle} />
       )}
       <div className={`evershop-section__inner relative ${paddingClass}`}>
-        <WidgetArea areaId={`columnsContainer_${widget.uuid}_col_0`} widgets={widget.columns[0]?.widgets ?? []} extras={extras} />
+        {/* Puck supplies children as a slot component; the widget pipeline
+            supplies them as data for a nested WidgetArea. Render whichever
+            this call was given — see `slots` in registry.tsx. */}
+        {slots?.[0] ? (
+          (() => {
+            const Slot0 = slots[0];
+            return <Slot0 />;
+          })()
+        ) : (
+          <WidgetArea areaId={`columnsContainer_${widget.uuid}_col_0`} widgets={widget.columns[0]?.widgets ?? []} extras={extras} />
+        )}
       </div>
     </div>
   );

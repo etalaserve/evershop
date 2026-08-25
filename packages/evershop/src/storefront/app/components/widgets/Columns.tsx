@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react';
-
 import { WidgetArea } from './WidgetArea.js';
 import type { WidgetComponentProps } from '~/lib/widgets/registry.js';
 
@@ -34,7 +33,7 @@ function parseRatio(ratio: string | null | undefined, fallbackCount: number): { 
   return { parts, gridCols: parts.map((p) => `${p}fr`).join(' ') };
 }
 
-export function Columns({ widget, extras }: WidgetComponentProps) {
+export function Columns({ widget, extras, slots }: WidgetComponentProps) {
   const s = widget.rawSettings as {
     columnCount?: number;
     gap?: number;
@@ -63,7 +62,16 @@ export function Columns({ widget, extras }: WidgetComponentProps) {
         >
           {parts.map((_, i) => (
             <div key={i} className={`evershop-columns__column flex flex-col ${anchorClass}`} style={{ position: 'relative' }}>
-              <WidgetArea areaId={`columnsContainer_${widget.uuid}_col_${i}`} widgets={widget.columns[i]?.widgets ?? []} extras={extras} />
+              {(() => {
+                // Puck passes a slot component per column; the widget pipeline
+                // passes data for a nested WidgetArea. See `slots` in registry.tsx.
+                const Slot = slots?.[i];
+                return Slot ? (
+                  <Slot />
+                ) : (
+                  <WidgetArea areaId={`columnsContainer_${widget.uuid}_col_${i}`} widgets={widget.columns[i]?.widgets ?? []} extras={extras} />
+                );
+              })()}
             </div>
           ))}
         </div>
