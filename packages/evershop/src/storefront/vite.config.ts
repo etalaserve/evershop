@@ -12,6 +12,15 @@ export default defineConfig({
   base: '/storefront-assets/',
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   optimizeDeps: {
+    // Pre-bundle the Puck editor. It is a large ESM package whose module
+    // graph the dev server would otherwise transform one request at a time on
+    // first load of the page-builder route — measured at ~45s before the
+    // editor became interactive, with the canvas sitting empty the whole time
+    // and no error to explain it. esbuild collapses it into a single
+    // pre-bundled dependency instead. Vite only auto-discovers dependencies
+    // reachable from the entry it crawls at startup, and this one is reachable
+    // only from an admin route, so it has to be named explicitly.
+    include: ['@puckeditor/core', '@puckeditor/core/rsc'],
     // `sanitize-html` (used client-side by `RichContent`, not just SSR) pulls
     // in `postcss` for style-attribute sanitization, and one of postcss's
     // files references the bare `Buffer` global with a pattern written for
@@ -41,6 +50,8 @@ export default defineConfig({
     warmup: {
       clientFiles: [
         './app/routes/admin_.page-builder.edit.$routeId.tsx',
+        './app/routes/admin_.page-builder.puck.$routeId.tsx',
+        './app/lib/puck/*.ts*',
         './app/components/widgets/*.tsx',
         './app/components/page-builder-admin/*.tsx',
         './app/components/ui/*.tsx',

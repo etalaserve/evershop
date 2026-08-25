@@ -97,7 +97,22 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   try {
     const loginRes = await ctx.post('/admin/user/login', {
       data: { email: admin.email, password: admin.password },
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        // `/admin/user/login` sits in the strict `auth` rate-limit tier: 8
+        // requests per 15 minutes per IP. globalSetup logs in once per run, so
+        // the 9th suite run inside a window fails EVERY spec with a confusing
+        // "Admin login failed: 429" that looks like a broken fixture rather
+        // than a rate limit. Iterating on one spec hits that easily.
+        //
+        // This is the limiter's own documented exemption
+        // (`INTERNAL_REQUEST_HEADER` in modules/base/services/rateLimit.ts),
+        // and it is honoured ONLY together with a loopback source address —
+        // which the test runner always is — so it cannot weaken the limiter
+        // for real traffic. Scoped to this one login rather than applied to
+        // every request context, so specs still exercise the limiter normally.
+        'x-evershop-internal': '1'
+      }
     });
     if (!loginRes.ok()) {
       const body = await loginRes.text().catch(() => '<no body>');
