@@ -1,4 +1,4 @@
-import { buildUrl } from '../../../../../lib/router/buildUrl.js';
+import { pageBuilderEditUrl } from '../../../services/pageBuilderEditUrl.js';
 import { getRoutes } from '../../../../../lib/router/Router.js';
 import { EvershopRequest } from '../../../../../types/request.js';
 import { EvershopResponse } from '../../../../../types/response.js';
@@ -41,7 +41,7 @@ export default (
   if (firstEditable) {
     response.redirect(
       302,
-      buildUrl('pageBuilderEdit', { routeId: firstEditable.id })
+      pageBuilderEditUrl(firstEditable.id)
     );
     // Response already sent — do not call next(), otherwise downstream
     // middleware (notFound, buildQuery, render) will try to send a body.
