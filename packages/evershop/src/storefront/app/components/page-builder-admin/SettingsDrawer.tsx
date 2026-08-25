@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-
+import { SettingsForm } from './SettingsForm.js';
 import { Button } from '~/components/ui/button.js';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '~/components/ui/sheet.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs.js';
 import { Textarea } from '~/components/ui/textarea.js';
 import { WIDGET_FIELD_CONFIGS } from '~/lib/page-builder-admin/fieldConfig.js';
-import { SettingsForm } from './SettingsForm.js';
 
 export interface SelectedWidget {
   widgetUid: string;
@@ -23,10 +22,13 @@ export interface SelectedWidget {
  */
 export function SettingsDrawer({
   widget,
+  isBusy = false,
   onClose,
   onSave
 }: {
   widget: SelectedWidget | null;
+  /** Disables Save while a mutation is in flight — without it a double-click queues duplicate operations into the changeset. */
+  isBusy?: boolean;
   onClose: () => void;
   onSave: (newSettings: Record<string, unknown>) => void;
 }) {
@@ -35,6 +37,7 @@ export function SettingsDrawer({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [tab, setTab] = useState<'form' | 'json'>('form');
 
+  const widgetUid = widget?.widgetUid;
   useEffect(() => {
     if (widget) {
       setValues(widget.settings);
@@ -42,7 +45,11 @@ export function SettingsDrawer({
       setJsonError(null);
       setTab(WIDGET_FIELD_CONFIGS[widget.widgetType] ? 'form' : 'json');
     }
-  }, [widget]);
+    // Keyed on the widget's IDENTITY, not the `widget` object. The drawer now
+    // stays open across saves and the caller advances its settings baseline by
+    // recreating that object; re-seeding on every new object identity would
+    // discard edits the user typed while a save was still in flight.
+  }, [widgetUid]);
 
   const fields = widget ? WIDGET_FIELD_CONFIGS[widget.widgetType] : undefined;
 
@@ -96,6 +103,7 @@ export function SettingsDrawer({
         </div>
         <SheetFooter>
           <Button
+            disabled={isBusy}
             onClick={() => {
               if (tab === 'json') {
                 try {
@@ -110,7 +118,7 @@ export function SettingsDrawer({
               }
             }}
           >
-            Save
+            {isBusy ? 'Saving…' : 'Save'}
           </Button>
         </SheetFooter>
       </SheetContent>

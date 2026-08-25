@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-
 import { isInPageBuilderIframe, markPageBuilderActive } from './pageBuilderMode.js';
-import { usePreviewWidgets, type PreviewWidget } from './PreviewContext.js';
+import { usePreviewSnapshot, type PreviewWidget } from './PreviewContext.js';
 import { ensureChromeStyleInjected } from './WidgetChrome.js';
 
 /**
@@ -18,6 +17,8 @@ import { ensureChromeStyleInjected } from './WidgetChrome.js';
 interface DataUpdateMessage {
   type: 'data-update';
   widgets?: PreviewWidget[];
+  /** Server-resolved widget data keyed by uuid, from the admin's preview-snapshot fetch. Applied in the same commit as `widgets` — see PreviewContext. */
+  extras?: Record<string, unknown>;
   sequence?: number;
 }
 
@@ -68,7 +69,7 @@ function ensureGlobalsOutlineStyle(): void {
 }
 
 export function PageBuilderBridge(): null {
-  const { setWidgets } = usePreviewWidgets();
+  const { setPreview } = usePreviewSnapshot();
   const lastSequence = useRef(0);
 
   useEffect(() => {
@@ -149,9 +150,22 @@ export function PageBuilderBridge(): null {
         if (raw.sequence <= lastSequence.current) return;
         lastSequence.current = raw.sequence;
       }
-      if (raw.widgets) setWidgets(raw.widgets);
+      if (raw.widgets) {
+        setPreview({ widgets: raw.widgets, extras: raw.extras ?? {} });
+      }
 
-      requestAnimationFrame(() => reportWidgetOrder());
+      requestAnimationFrame(() => {
+        // Settle marker for tests and for anyone watching the canvas apply
+        // an edit. Until now the only observable "the canvas caught up"
+        // signal was the iframe's own document reload, which every
+        // drag-and-drop spec implicitly waited on; with the reload gone
+        // those waits would become races. Written after the rAF so it
+        // trails the paint, not the state commit.
+        if (typeof raw.sequence === 'number') {
+          document.body.dataset.evershopPbSeq = String(raw.sequence);
+        }
+        reportWidgetOrder();
+      });
     };
 
     requestAnimationFrame(() => reportWidgetOrder());
@@ -163,7 +177,7 @@ export function PageBuilderBridge(): null {
       document.removeEventListener('click', onLinkActivate, true);
       document.removeEventListener('auxclick', onLinkActivate, true);
     };
-  }, [setWidgets]);
+  }, [setPreview]);
 
   return null;
 }

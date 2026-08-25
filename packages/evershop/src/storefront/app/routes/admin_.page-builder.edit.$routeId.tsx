@@ -12,6 +12,7 @@ import { SessionPicker } from '~/components/page-builder-admin/SessionPicker.js'
 import { SettingsDrawer, type SelectedWidget } from '~/components/page-builder-admin/SettingsDrawer.js';
 import { ThemeSheet } from '~/components/page-builder-admin/ThemeSheet.js';
 import { Topbar, type DeviceMode } from '~/components/page-builder-admin/Topbar.js';
+import { Alert, AlertDescription } from '~/components/ui/alert.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs.js';
 import { getCurrentAdminUser } from '~/lib/admin/session.js';
 import { gqlAdmin } from '~/lib/graphql/admin-client.js';
@@ -28,6 +29,12 @@ import { STORE_SETTINGS_QUERY, type StoreSettingsResponse } from '~/lib/graphql/
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetFragment, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { pageBuilderApi } from '~/lib/page-builder-admin/api.js';
 import { getOrCreateDraft } from '~/lib/page-builder-admin/changeset.js';
+import {
+  applyAdd,
+  applyDelete,
+  applyMove,
+  applyUpdateSettings
+} from '~/lib/page-builder-admin/localApply.js';
 import { buildAddWidgetOps, buildDeleteOps, buildMoveOp, buildUpdateSettingsOp } from '~/lib/page-builder-admin/operations.js';
 import { findPlacement, flattenWidgets } from '~/lib/page-builder-admin/widgetLookup.js';
 import { paletteEntry, shuffleCandidates } from '~/lib/page-builder-admin/widgetPalette.js';
@@ -91,7 +98,7 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
 }
 
 export default function PageBuilderEditor() {
-  const { route, changeset, widgets, inRolloutSession, themeTokens } = useLoaderData<typeof loader>();
+  const { route, changeset, widgets: loaderWidgets, inRolloutSession, themeTokens } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [selected, setSelected] = useState<SelectedWidget | null>(null);
@@ -103,31 +110,129 @@ export default function PageBuilderEditor() {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [rolloutOpen, setRolloutOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const reloadCanvas = useCallback(() => {
-    iframeRef.current?.contentWindow?.location.reload();
-  }, []);
+  /**
+   * Optimistic mirror of the widget tree. Null until the first edit, so the
+   * initial render is plain loader data. Once set it wins, and every
+   * mutation replaces it — first with a locally-computed guess (instant),
+   * then with the authoritative server snapshot a moment later.
+   */
+  const [overlay, setOverlay] = useState<WidgetFragment[] | null>(null);
+  const widgets = overlay ?? loaderWidgets;
 
-  const afterMutation = useCallback(() => {
-    revalidator.revalidate();
-    reloadCanvas();
-  }, [revalidator, reloadCanvas]);
+  // Latest-value refs so the message handler and mutation helpers never close
+  // over a stale tree (they're registered once, not per render).
+  const widgetsRef = useRef(widgets);
+  widgetsRef.current = widgets;
+  const extrasRef = useRef<Record<string, unknown>>({});
+  // Monotonic, shared by optimistic and authoritative pushes — the canvas
+  // bridge drops any `data-update` whose sequence isn't strictly greater.
+  const seqRef = useRef(0);
+  // The most recently *initiated* mutation. An in-flight older mutation whose
+  // snapshot arrives late must not overwrite a newer one's state.
+  const latestSeqRef = useRef(0);
 
-  const withBusy = useCallback(async (fn: () => Promise<void>) => {
-    setIsBusy(true);
-    try {
-      await fn();
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err);
-    } finally {
-      setIsBusy(false);
-    }
-  }, []);
+  // Reset the mirror when the editor switches route or changeset — otherwise
+  // the previous page's tree would flash into the new canvas.
+  useEffect(() => {
+    setOverlay(null);
+    extrasRef.current = {};
+  }, [route.id, changeset.token]);
 
   const postToCanvas = useCallback((message: Record<string, unknown>) => {
     iframeRef.current?.contentWindow?.postMessage(message, window.location.origin);
   }, []);
+
+  const pushToCanvas = useCallback(
+    (tree: WidgetFragment[], extras: Record<string, unknown>, sequence: number) => {
+      postToCanvas({ type: 'data-update', widgets: tree, extras, sequence });
+    },
+    [postToCanvas]
+  );
+
+  /** Authoritative widget tree + server-resolved extras for the current route/changeset. */
+  const fetchSnapshot = useCallback(async () => {
+    const params = new URLSearchParams({ route: route.id, changeset: changeset.token });
+    const res = await fetch(`/admin/page-builder/preview?${params.toString()}`, {
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error(`Could not refresh the preview (${res.status})`);
+    return (await res.json()) as { widgets: WidgetFragment[]; extras: Record<string, unknown> };
+  }, [route.id, changeset.token]);
+
+  const applySnapshot = useCallback(
+    (snap: { widgets: WidgetFragment[]; extras: Record<string, unknown> }) => {
+      extrasRef.current = snap.extras;
+      setOverlay(snap.widgets);
+      pushToCanvas(snap.widgets, snap.extras, ++seqRef.current);
+    },
+    [pushToCanvas]
+  );
+
+  /**
+   * Settle a mutation against the server. On success the authoritative
+   * snapshot replaces the optimistic tree wholesale — no merging, so a bug in
+   * `localApply` self-corrects within a round trip instead of persisting.
+   *
+   * On failure we re-sync from the server rather than reverting to the
+   * pre-edit tree: operations are still posted one at a time, so a partial
+   * failure may have committed some of them, and a blind revert would show
+   * state that no longer matches the changeset. (Once writes are atomic this
+   * can become a true revert.)
+   */
+  const settle = useCallback(
+    async (seq: number, remote: () => Promise<void>) => {
+      setIsBusy(true);
+      setError(null);
+      try {
+        await remote();
+        const snap = await fetchSnapshot();
+        if (latestSeqRef.current !== seq) return; // superseded by a newer edit
+        applySnapshot(snap);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        try {
+          applySnapshot(await fetchSnapshot());
+        } catch {
+          // Leave the optimistic tree in place; the banner already says why.
+        }
+      } finally {
+        setIsBusy(false);
+        // Only for the topbar's canUndo/canRedo/operationCount — the widget
+        // tree comes from the snapshot above, not from this.
+        revalidator.revalidate();
+      }
+    },
+    [fetchSnapshot, applySnapshot, revalidator]
+  );
+
+  /** Optimistic path: show the edit immediately, then reconcile. */
+  const mutate = useCallback(
+    (localFn: (tree: WidgetFragment[]) => WidgetFragment[], remote: () => Promise<void>) => {
+      const seq = ++seqRef.current;
+      latestSeqRef.current = seq;
+      const optimistic = localFn(widgetsRef.current);
+      setOverlay(optimistic);
+      pushToCanvas(optimistic, extrasRef.current, seq);
+      void settle(seq, remote);
+    },
+    [pushToCanvas, settle]
+  );
+
+  /**
+   * Non-optimistic path, for mutations whose local result isn't worth
+   * predicting (shuffle, clear, undo/redo, publish, discard): run it, then
+   * take whatever the server says.
+   */
+  const runRemote = useCallback(
+    (remote: () => Promise<void>) => {
+      const seq = ++seqRef.current;
+      latestSeqRef.current = seq;
+      void settle(seq, remote);
+    },
+    [settle]
+  );
 
   function selectWidget(widget: WidgetFragment) {
     setSelected({ widgetUid: widget.uuid, widgetType: widget.type, settings: widget.rawSettings });
@@ -155,65 +260,100 @@ export default function PageBuilderEditor() {
         case 'pb-drop': {
           const entry = paletteEntry(msg.widgetType as string);
           if (!entry) break;
-          withBusy(async () => {
-            const { ops } = buildAddWidgetOps({
-              route: route.id,
-              area: msg.area as string,
-              sortOrder: msg.sortOrder as number,
-              type: entry.type,
-              name: entry.label,
-              defaultSettings: entry.defaultSettings,
-              isGlobal: msg.isGlobal as boolean
-            });
-            for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
-            afterMutation();
+          const area = msg.area as string;
+          const sortOrder = msg.sortOrder as number;
+          const { ops, ids } = buildAddWidgetOps({
+            route: route.id,
+            area,
+            sortOrder,
+            type: entry.type,
+            name: entry.label,
+            defaultSettings: entry.defaultSettings,
+            isGlobal: msg.isGlobal as boolean
           });
+          mutate(
+            (tree) =>
+              applyAdd(tree, {
+                instanceUuid: ids.instanceUuid,
+                placementUuid: ids.placementUuid,
+                type: entry.type,
+                area,
+                sortOrder,
+                settings: entry.defaultSettings
+              }),
+            async () => {
+              for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
+            }
+          );
           break;
         }
         case 'widget-move-up':
         case 'widget-move-down': {
-          const found = findPlacement(widgets, msg.widgetUid as string, msg.area as string);
+          const widgetUid = msg.widgetUid as string;
+          const area = msg.area as string;
+          const newSortOrder = msg.sortOrder as number;
+          const found = findPlacement(widgetsRef.current, widgetUid, area);
           if (!found) break;
-          withBusy(async () => {
-            const op = buildMoveOp({
-              route: route.id,
-              placementUuid: found.placement.uuid,
-              oldSortOrder: found.placement.sortOrder,
-              newSortOrder: msg.sortOrder as number
-            });
-            await pageBuilderApi.addOperation(changeset.id, op);
-            afterMutation();
+          const op = buildMoveOp({
+            route: route.id,
+            placementUuid: found.placement.uuid,
+            oldSortOrder: found.placement.sortOrder,
+            newSortOrder
           });
+          mutate(
+            (tree) => applyMove(tree, widgetUid, area, newSortOrder),
+            async () => {
+              await pageBuilderApi.addOperation(changeset.id, op);
+            }
+          );
           break;
         }
         case 'widget-duplicate': {
-          const found = findPlacement(widgets, msg.widgetUid as string, msg.area as string);
+          const area = msg.area as string;
+          const found = findPlacement(widgetsRef.current, msg.widgetUid as string, area);
           if (!found) break;
-          withBusy(async () => {
-            const { ops } = buildAddWidgetOps({
-              route: route.id,
-              area: msg.area as string,
-              sortOrder: found.placement.sortOrder + 0.5,
-              type: found.widget.type,
-              name: `${found.widget.type} copy`,
-              defaultSettings: found.widget.rawSettings
-            });
-            for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
-            afterMutation();
+          const sortOrder = found.placement.sortOrder + 0.5;
+          const { ops, ids } = buildAddWidgetOps({
+            route: route.id,
+            area,
+            sortOrder,
+            type: found.widget.type,
+            name: `${found.widget.type} copy`,
+            defaultSettings: found.widget.rawSettings
           });
+          mutate(
+            (tree) =>
+              applyAdd(tree, {
+                instanceUuid: ids.instanceUuid,
+                placementUuid: ids.placementUuid,
+                type: found.widget.type,
+                area,
+                sortOrder,
+                settings: found.widget.rawSettings
+              }),
+            async () => {
+              for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
+            }
+          );
           break;
         }
         case 'widget-delete': {
           const widgetUid = msg.widgetUid as string;
-          const widget = flattenWidgets(widgets).find((w) => w.uuid === widgetUid);
+          const widget = flattenWidgets(widgetsRef.current).find((w) => w.uuid === widgetUid);
           const placement = widget?.placements[0];
           if (!widget || !placement) break;
-          withBusy(async () => {
-            const ops = buildDeleteOps({ route: route.id, instanceUuid: widget.uuid, placementUuid: placement.uuid });
-            for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
-            setSelected(null);
-            afterMutation();
+          const ops = buildDeleteOps({
+            route: route.id,
+            instanceUuid: widget.uuid,
+            placementUuid: placement.uuid
           });
+          setSelected(null);
+          mutate(
+            (tree) => applyDelete(tree, widgetUid),
+            async () => {
+              for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
+            }
+          );
           break;
         }
         default:
@@ -222,21 +362,26 @@ export default function PageBuilderEditor() {
     }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [widgets, route.id, changeset.id, afterMutation, withBusy]);
+  }, [route.id, changeset.id, mutate]);
 
   const handleSaveSettings = (newSettings: Record<string, unknown>) => {
     if (!selected) return;
-    withBusy(async () => {
-      const op = buildUpdateSettingsOp({
-        route: route.id,
-        instanceUuid: selected.widgetUid,
-        oldSettings: selected.settings,
-        newSettings
-      });
-      await pageBuilderApi.addOperation(changeset.id, op);
-      setSelected(null);
-      afterMutation();
+    const widgetUid = selected.widgetUid;
+    const op = buildUpdateSettingsOp({
+      route: route.id,
+      instanceUuid: widgetUid,
+      oldSettings: selected.settings,
+      newSettings
     });
+    // Advance the drawer's baseline instead of closing it — the previous
+    // behavior (setSelected(null)) forced a re-select for every single edit.
+    setSelected({ ...selected, settings: newSettings });
+    mutate(
+      (tree) => applyUpdateSettings(tree, widgetUid, newSettings),
+      async () => {
+        await pageBuilderApi.addOperation(changeset.id, op);
+      }
+    );
   };
 
   const handleAddFromPalette = (variantId: string) => {
@@ -244,27 +389,38 @@ export default function PageBuilderEditor() {
     if (!entry) return;
     const maxSort = Math.max(
       0,
-      ...flattenWidgets(widgets)
+      ...flattenWidgets(widgetsRef.current)
         .flatMap((w) => w.placements)
         .filter((p) => p.area === DEFAULT_AREA)
         .map((p) => p.sortOrder)
     );
-    withBusy(async () => {
-      const { ops } = buildAddWidgetOps({
-        route: route.id,
-        area: DEFAULT_AREA,
-        sortOrder: maxSort + 100,
-        type: entry.type,
-        name: entry.label,
-        defaultSettings: entry.defaultSettings
-      });
-      for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
-      afterMutation();
+    const sortOrder = maxSort + 100;
+    const { ops, ids } = buildAddWidgetOps({
+      route: route.id,
+      area: DEFAULT_AREA,
+      sortOrder,
+      type: entry.type,
+      name: entry.label,
+      defaultSettings: entry.defaultSettings
     });
+    mutate(
+      (tree) =>
+        applyAdd(tree, {
+          instanceUuid: ids.instanceUuid,
+          placementUuid: ids.placementUuid,
+          type: entry.type,
+          area: DEFAULT_AREA,
+          sortOrder,
+          settings: entry.defaultSettings
+        }),
+      async () => {
+        for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
+      }
+    );
   };
 
   const clearArea = async () => {
-    const existing = flattenWidgets(widgets)
+    const existing = flattenWidgets(widgetsRef.current)
       .flatMap((w) => w.placements.map((placement) => ({ widget: w, placement })))
       .filter(({ placement }) => placement.area === DEFAULT_AREA);
     for (const { widget, placement } of existing) {
@@ -274,7 +430,8 @@ export default function PageBuilderEditor() {
   };
 
   const handleShuffle = () => {
-    withBusy(async () => {
+    setSelected(null);
+    runRemote(async () => {
       await clearArea();
       const pool = shuffleCandidates();
       const count = Math.min(pool.length, 4 + Math.floor(Math.random() * 3));
@@ -293,27 +450,37 @@ export default function PageBuilderEditor() {
         for (const op of ops) await pageBuilderApi.addOperation(changeset.id, op);
         sortOrder += 100;
       }
-      setSelected(null);
-      afterMutation();
     });
   };
 
   const handleClear = () => {
-    withBusy(async () => {
-      await clearArea();
-      setSelected(null);
-      afterMutation();
-    });
+    setSelected(null);
+    // Optimistically empty the area — the ops themselves still go one at a
+    // time, but the canvas shouldn't wait for all of them to clear.
+    mutate(
+      (tree) =>
+        flattenWidgets(tree)
+          .filter((w) => w.placements.some((p) => p.area === DEFAULT_AREA))
+          .reduce((acc, w) => applyDelete(acc, w.uuid), tree),
+      () => clearArea()
+    );
   };
 
   const handleLayerReorder = (widgetUid: string, oldSortOrder: number, newSortOrder: number) => {
-    const found = findPlacement(widgets, widgetUid, DEFAULT_AREA);
+    const found = findPlacement(widgetsRef.current, widgetUid, DEFAULT_AREA);
     if (!found) return;
-    withBusy(async () => {
-      const op = buildMoveOp({ route: route.id, placementUuid: found.placement.uuid, oldSortOrder, newSortOrder });
-      await pageBuilderApi.addOperation(changeset.id, op);
-      afterMutation();
+    const op = buildMoveOp({
+      route: route.id,
+      placementUuid: found.placement.uuid,
+      oldSortOrder,
+      newSortOrder
     });
+    mutate(
+      (tree) => applyMove(tree, widgetUid, DEFAULT_AREA, newSortOrder),
+      async () => {
+        await pageBuilderApi.addOperation(changeset.id, op);
+      }
+    );
   };
 
   const toggleGlobalsView = () => {
@@ -327,7 +494,7 @@ export default function PageBuilderEditor() {
   };
 
   const handleThemeApply = (light: string, dark: string) => {
-    withBusy(async () => {
+    runRemote(async () => {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -336,7 +503,9 @@ export default function PageBuilderEditor() {
       });
       if (!res.ok) throw new Error(`Theme save failed (${res.status})`);
       setThemeOpen(false);
-      afterMutation();
+      // The applied theme is a document-level stylesheet, not widget data, so
+      // a snapshot push can't deliver it — reload the canvas once, here only.
+      iframeRef.current?.contentWindow?.location.reload();
     });
   };
 
@@ -348,6 +517,18 @@ export default function PageBuilderEditor() {
           max-w-6xl column), so both storefront AND admin chrome need
           hiding, not just storefront. */}
       <style>{'header, footer { display: none !important; }'}</style>
+      {error && (
+        // Mutation failures used to be swallowed into console.error, leaving
+        // the canvas showing an edit the server had rejected.
+        <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>{error}</span>
+            <button type="button" className="shrink-0 underline" onClick={() => setError(null)}>
+              Dismiss
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
       <Topbar
         routeName={route.name}
         canUndo={changeset.canUndo}
@@ -356,15 +537,13 @@ export default function PageBuilderEditor() {
         globalsView={globalsView}
         deviceMode={deviceMode}
         onUndo={() =>
-          withBusy(async () => {
+          runRemote(async () => {
             await pageBuilderApi.moveCurrent(changeset.id, route.id, 'undo');
-            afterMutation();
           })
         }
         onRedo={() =>
-          withBusy(async () => {
+          runRemote(async () => {
             await pageBuilderApi.moveCurrent(changeset.id, route.id, 'redo');
-            afterMutation();
           })
         }
         onShuffle={handleShuffle}
@@ -408,7 +587,12 @@ export default function PageBuilderEditor() {
           </div>
         </main>
       </div>
-      <SettingsDrawer widget={selected} onClose={() => setSelected(null)} onSave={handleSaveSettings} />
+      <SettingsDrawer
+        widget={selected}
+        isBusy={isBusy}
+        onClose={() => setSelected(null)}
+        onSave={handleSaveSettings}
+      />
       <ThemeSheet
         open={themeOpen}
         onOpenChange={setThemeOpen}
@@ -422,10 +606,9 @@ export default function PageBuilderEditor() {
         isBusy={isBusy}
         onOpenChange={setPublishOpen}
         onConfirm={() =>
-          withBusy(async () => {
+          runRemote(async () => {
             await pageBuilderApi.publish(changeset.id);
             setPublishOpen(false);
-            afterMutation();
           })
         }
       />
@@ -435,10 +618,10 @@ export default function PageBuilderEditor() {
         isBusy={isBusy}
         onOpenChange={setDiscardOpen}
         onConfirm={() =>
-          withBusy(async () => {
+          runRemote(async () => {
             await pageBuilderApi.discard(changeset.id, route.id);
             setDiscardOpen(false);
-            afterMutation();
+            setSelected(null);
           })
         }
       />
@@ -447,7 +630,7 @@ export default function PageBuilderEditor() {
         changesetId={changeset.id}
         editingPlan={null}
         onOpenChange={setRolloutOpen}
-        onSaved={() => afterMutation()}
+        onSaved={() => runRemote(async () => {})}
       />
       <SessionPicker routeId={route.id} active={!inRolloutSession} />
     </div>

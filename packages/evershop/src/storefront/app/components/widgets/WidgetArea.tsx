@@ -1,10 +1,9 @@
 import React from 'react';
-
+import type { WidgetFragment } from '~/lib/graphql/queries/widgets.js';
 import { AreaDropZone } from '~/lib/page-builder/AreaDropZone.js';
 import { useIsInPageBuilderIframe } from '~/lib/page-builder/pageBuilderMode.js';
-import { usePreviewWidgets } from '~/lib/page-builder/PreviewContext.js';
+import { usePreviewSnapshot } from '~/lib/page-builder/PreviewContext.js';
 import { WidgetChrome } from '~/lib/page-builder/WidgetChrome.js';
-import type { WidgetFragment } from '~/lib/graphql/queries/widgets.js';
 import { getStorefrontWidget } from '~/lib/widgets/registry.js';
 
 function sortOrderFor(widget: WidgetFragment, areaId: string): number {
@@ -63,11 +62,17 @@ export function WidgetArea({
   editableInPageBuilder?: boolean;
 }): React.ReactElement {
   const inPageBuilder = useIsInPageBuilderIframe();
-  const { widgets: previewWidgets } = usePreviewWidgets();
-  // Inside the page-builder iframe, prefer the live-edited widget list once
-  // the bridge has received at least one `data-update` — falls back to the
-  // loader-fetched list for the iframe's own first paint.
-  const source = inPageBuilder && previewWidgets ? previewWidgets : widgets;
+  const { preview } = usePreviewSnapshot();
+  // Inside the page-builder iframe, prefer the live-edited snapshot once the
+  // bridge has received at least one `data-update` — falls back to the
+  // loader-fetched data for the iframe's own first paint.
+  //
+  // Widgets and extras must come from the SAME source. Taking widgets from
+  // the preview but extras from the loader would render an edited widget
+  // against its predecessor's resolved products.
+  const usePreview = inPageBuilder && preview !== null;
+  const source = usePreview ? preview.widgets : widgets;
+  const effectiveExtras = usePreview ? preview.extras : extras;
 
   const items = findWidgetsInArea(source, areaId).sort(
     (a, b) => sortOrderFor(a, areaId) - sortOrderFor(b, areaId)
@@ -94,7 +99,12 @@ export function WidgetArea({
               sortOrder={sortOrder}
               settings={widget.rawSettings}
             >
-              <Component widget={widget} extra={extras?.[widget.uuid]} extras={extras} />
+              {/* Both props matter: `extra` is this widget's own resolved
+                  data, `extras` is the whole map that container widgets
+                  (Columns/Section) thread down into their nested
+                  WidgetAreas. Passing the preview map to one but not the
+                  other silently breaks nested commerce widgets. */}
+              <Component widget={widget} extra={effectiveExtras?.[widget.uuid]} extras={effectiveExtras} />
             </WidgetChrome>
             {editableInPageBuilder && <AreaDropZone areaId={areaId} afterUid={widget.uuid} />}
           </React.Fragment>
