@@ -1,0 +1,13 @@
+[
+  {
+    "type": "related_products",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 100,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  }
+]

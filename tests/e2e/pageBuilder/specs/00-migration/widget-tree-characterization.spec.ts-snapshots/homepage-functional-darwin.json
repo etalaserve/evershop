@@ -1,0 +1,24 @@
+[
+  {
+    "type": "top_categories",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 100,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  },
+  {
+    "type": "latest_products",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 200,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  }
+]
