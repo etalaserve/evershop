@@ -7,6 +7,8 @@ import { Badge } from '~/components/ui/badge.js';
 import { Button } from '~/components/ui/button.js';
 import { Separator } from '~/components/ui/separator.js';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { addToCart } from '~/lib/cart/client.js';
 import { gql } from '~/lib/graphql/client.js';
@@ -33,13 +35,22 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   }
 
   const widgets = widgetData.widgetsForRoute;
-  const extras = mergeProductAnchorExtras(await resolveWidgetExtras(widgets, cookie), widgets, {
+  // The three product-anchored recommendation widgets read these arrays rather
+  // than issuing their own query — `PRODUCT_DETAIL_QUERY` already fetched them.
+  const anchor = {
     relatedProducts: result.productByUrlKey.relatedProducts,
     crossSellProducts: result.productByUrlKey.crossSellProducts,
     upsellProducts: result.productByUrlKey.upsellProducts
-  });
+  };
+  const extras = mergeProductAnchorExtras(await resolveWidgetExtras(widgets, cookie), widgets, anchor);
 
-  return { product: result.productByUrlKey, canonical: canonicalUrl(request), widgets, extras };
+  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+  // The anchor goes in as metadata, so under Puck the product-anchored types
+  // are resolved by `resolvePuckExtras` like any other widget rather than
+  // merged in afterwards by this route.
+  const puck = await loadPuckForRequest(request, ROUTE_ID, { anchor });
+
+  return { product: result.productByUrlKey, canonical: canonicalUrl(request), widgets, extras, puck };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -55,7 +66,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function ProductPage() {
-  const { product, canonical, widgets, extras } = useLoaderData<typeof loader>();
+  const { product, canonical, widgets, extras, puck } = useLoaderData<typeof loader>();
   const [qty, setQty] = useState(1);
   const [status, setStatus] = useState<'idle' | 'adding' | 'added' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +209,11 @@ export default function ProductPage() {
           route-level `related_products` widget seeded onto `productView` by
           the catalog migration below, so every product page keeps the same
           default behavior but it's now a real, editable/removable widget. */}
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </div>
   );
 }

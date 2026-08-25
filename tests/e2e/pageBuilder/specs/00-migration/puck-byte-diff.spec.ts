@@ -27,16 +27,94 @@ import { backfillPuckDocuments } from '../../../../../packages/evershop/dist/lib
  *    `widget-tree-characterization.spec.ts` deliberately snapshots the widget
  *    TREE instead, which is stable — the two are complements.)
  *
- * Phase 2 covers `cmsPageView` only: a CMS page is pure content with no
- * commerce extras, which isolates the config generator and converter from the
- * data-resolution work in Phase 3. Later phases extend `ROUTES` as each one
- * starts rendering through Puck.
+ * Every route that mounts a widget area is covered. "Byte-diff green on all
+ * routes" is a hard pre-merge gate for the big-bang cutover: because
+ * everything switches at once, there is no per-route flag to fall back to.
  */
 
-const ROUTES = [{ routeId: 'cmsPageView', path: (urlKey: string) => `/page/${urlKey}` }];
+interface RouteCase {
+  routeId: string;
+  /**
+   * Resolve the route to a concrete URL against the live store. Returns null
+   * when this store has no suitable entity, which SKIPS rather than passes —
+   * a route silently dropping out of the matrix is exactly how a gate stops
+   * meaning anything.
+   */
+  resolvePath: (
+    db: ReturnType<typeof getDb>
+  ) => Promise<string | null>;
+  /** Set when the route can't be fetched anonymously; skipped with this reason. */
+  skip?: string;
+}
+
+async function firstValue(
+  db: ReturnType<typeof getDb>,
+  sql: string
+): Promise<string | null> {
+  const { rows } = await db.query<{ value: string }>(sql);
+  return rows[0]?.value ?? null;
+}
+
+const ROUTES: RouteCase[] = [
+  { routeId: 'homepage', resolvePath: async () => '/' },
+  { routeId: 'cart', resolvePath: async () => '/cart' },
+  { routeId: 'blogHome', resolvePath: async () => '/blog' },
+  { routeId: 'catalogSearch', resolvePath: async () => '/search?keyword=a' },
+  {
+    routeId: 'cmsPageView',
+    resolvePath: (db) =>
+      firstValue(
+        db,
+        `SELECT '/page/' || url_key AS value FROM cms_page_description LIMIT 1`
+      )
+  },
+  // NOTE: `/category/<urlKey>` and `/product/<urlKey>`, NOT the pretty
+  // `url_rewrite` path (`/kids`). Only the former are in `MIGRATED_PATHS`;
+  // the rewritten paths a shopper actually follows still fall through to the
+  // legacy pipeline. Using those here made both sides render legacy markup,
+  // so the comparison passed while testing nothing — the seeded content was
+  // present on both sides because the LEGACY renderer drew it.
+  {
+    routeId: 'categoryView',
+    resolvePath: (db) =>
+      firstValue(
+        db,
+        `SELECT '/category/' || url_key AS value FROM category_description LIMIT 1`
+      )
+  },
+  {
+    routeId: 'productView',
+    resolvePath: (db) =>
+      firstValue(
+        db,
+        `SELECT '/product/' || url_key AS value FROM product_description LIMIT 1`
+      )
+  },
+  {
+    routeId: 'blogPostView',
+    resolvePath: (db) =>
+      firstValue(
+        db,
+        `SELECT '/blog/' || url_key AS value FROM blog_post_description LIMIT 1`
+      )
+  },
+  {
+    routeId: 'account',
+    resolvePath: async () => '/account',
+    // Redirects to login without a customer session, and this project carries
+    // an ADMIN session, not a customer one. Covering it needs a customer
+    // storageState — worth adding, but it is a fixture gap, not a converter
+    // result, so it is named here rather than quietly dropped.
+    skip: 'needs a customer session; this project is admin-authenticated'
+  }
+];
+
+function withEngine(path: string): string {
+  return `${path}${path.includes('?') ? '&' : '?'}__engine=puck`;
+}
 
 /**
- * Reduce a rendered page to just its widget area, normalized.
+ * Reduce a rendered page to just its comparable content, normalized.
  *
  * React injects per-render bookkeeping that differs between any two renders
  * of the same content and says nothing about correctness — stripping it is
@@ -51,8 +129,8 @@ function normalize(html: string): string {
     // React's own instance/state ids (`_R_`, `S:0`, `B:0`) — per-render.
     .replace(/\sid="(?:_R_[^"]*|[SBP]:\d+)"/g, '')
     // The RRv7 hydration payload: a serialized copy of loader data, which
-    // legitimately differs (one side carries `widgets`, the other
-    // `puckDocument`) without changing a single rendered pixel.
+    // legitimately differs (one side carries `widgets`, the other `puck`)
+    // without changing a single rendered pixel.
     .replace(/<script>window\.__reactRouter[\s\S]*?<\/script>/g, '')
     .replace(/<script[^>]*>\s*\$RC[\s\S]*?<\/script>/g, '')
     .replace(/<div hidden id="S:\d+">[\s\S]*?<\/div>/g, '')
@@ -66,11 +144,10 @@ function normalize(html: string): string {
     .replace(/>\s+</g, '><')
     .trim();
 
-  // Compare the route's own content only. Page chrome (header/nav/footer) is
-  // rendered identically by the route in both cases and only adds noise to a
-  // failure — and the trailing hydration scripts differ per render by design.
-  const article = body.match(/<article[\s\S]*?<\/article>/);
-  return article ? article[0] : body;
+  // Compare the rendered body only. `<head>` carries per-render asset
+  // preloads and the trailing hydration scripts differ by design.
+  const main = body.match(/<body[\s\S]*<\/body>/);
+  return main ? main[0] : body;
 }
 
 test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
@@ -78,14 +155,13 @@ test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
     test(`${route.routeId}: both engines render identical HTML`, async ({
       request
     }) => {
+      test.skip(!!route.skip, route.skip);
+
       const db = getDb();
       const marker = `e2e-bytediff-${randomUUID().slice(0, 8)}`;
 
-      const { rows: pages } = await db.query<{ url_key: string }>(
-        `SELECT url_key FROM cms_page_description LIMIT 1`
-      );
-      test.skip(pages.length === 0, 'no CMS page in this store to compare');
-      const urlKey = pages[0].url_key;
+      const path = await route.resolvePath(db);
+      test.skip(path === null, `no entity in this store to render ${route.routeId}`);
 
       // `backfillPuckDocuments` converts EVERY route that has widgets, not
       // just this one, so cleaning up only our own route would leave stray
@@ -127,8 +203,8 @@ test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
         const report = await backfillPuckDocuments(db as never);
         expect(report.orphaned, 'converter reported orphaned nodes').toEqual([]);
 
-        const widgetRes = await request.get(route.path(urlKey));
-        const puckRes = await request.get(`${route.path(urlKey)}?__engine=puck`);
+        const widgetRes = await request.get(path!);
+        const puckRes = await request.get(withEngine(path!));
         expect(widgetRes.ok()).toBe(true);
         expect(puckRes.ok()).toBe(true);
 
@@ -139,6 +215,17 @@ test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
         // seeded content, or two near-empty strings would compare equal.
         expect(widgetHtml).toContain('Byte diff');
         expect(puckHtml).toContain('Byte diff');
+
+        // And both must actually be the RRv7 app. A path outside
+        // `MIGRATED_PATHS` is answered by the LEGACY renderer, which ignores
+        // `?__engine=puck` entirely — so both sides would render the same
+        // legacy markup and the comparison would pass having tested nothing.
+        // This caught exactly that on the catalog routes. `var eContext` is
+        // the legacy renderer's payload and never appears in RRv7 output.
+        expect(widgetHtml, 'route is served by the legacy pipeline').not.toContain(
+          'var eContext'
+        );
+        expect(puckHtml).not.toContain('var eContext');
         expect(puckHtml).toBe(widgetHtml);
       } finally {
         // Leave the store exactly as found. Widget placements go with the

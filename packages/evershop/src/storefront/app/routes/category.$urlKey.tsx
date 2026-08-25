@@ -2,6 +2,8 @@ import { data, useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
 import { ProductGrid } from '~/components/catalog/product-grid.js';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { gql } from '~/lib/graphql/client.js';
 import { CATEGORY_BY_URL_KEY_QUERY, type CategoryPageResponse } from '~/lib/graphql/queries/catalog.js';
@@ -36,7 +38,12 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
 
-  return { category: result.categoryByUrlKey, canonical: canonicalUrl(request), widgets, extras };
+  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+
+  const puck = await loadPuckForRequest(request, ROUTE_ID);
+
+
+  return { category: result.categoryByUrlKey, canonical: canonicalUrl(request), widgets, extras, puck };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -51,7 +58,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function CategoryPage() {
-  const { category, widgets, extras } = useLoaderData<typeof loader>();
+  const { category, widgets, extras, puck } = useLoaderData<typeof loader>();
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
@@ -60,7 +67,11 @@ export default function CategoryPage() {
         <p className="text-sm text-muted-foreground">{category.products.total} products</p>
       </div>
       <ProductGrid products={category.products.items} />
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </div>
   );
 }

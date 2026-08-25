@@ -3,6 +3,8 @@ import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
 import { buttonVariants } from '~/components/ui/button.js';
 import { Separator } from '~/components/ui/separator.js';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { removeCartItem } from '~/lib/cart/client.js';
 import { gql } from '~/lib/graphql/client.js';
 import { CART_QUERY, type CartResponse } from '~/lib/graphql/queries/cart.js';
@@ -34,11 +36,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
 
-  return { cart: result.myCart, widgets, extras };
+  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+
+  const puck = await loadPuckForRequest(request, ROUTE_ID);
+
+
+  return { cart: result.myCart, widgets, extras, puck };
 }
 
 export default function CartPage() {
-  const { cart, widgets, extras } = useLoaderData<typeof loader>();
+  const { cart, widgets, extras, puck } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
 
   async function handleRemove(itemUuid: string) {
@@ -55,7 +62,11 @@ export default function CartPage() {
             Continue shopping
           </Link>
         </div>
-        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+        {puck ? (
+          <PuckArea data={puck.data} metadata={puck.metadata} />
+        ) : (
+          <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+        )}
       </div>
     );
   }
@@ -96,7 +107,11 @@ export default function CartPage() {
       <Link to="/checkout" className={cn(buttonVariants({ size: 'lg' }), 'w-full')}>
         Checkout
       </Link>
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { gql } from '~/lib/graphql/client.js';
 import { STORE_SETTINGS_QUERY, type StoreSettingsResponse } from '~/lib/graphql/queries/settings.js';
@@ -24,12 +26,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   ]);
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
+  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+  const puck = await loadPuckForRequest(request, ROUTE_ID);
+
   return {
     storeName: settings.setting.storeName,
     storeDescription: settings.setting.storeDescription,
     canonical: canonicalUrl(request),
     widgets,
-    extras
+    extras,
+    puck
   };
 }
 
@@ -43,7 +49,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function Home() {
-  const { widgets, extras } = useLoaderData<typeof loader>();
+  const { widgets, extras, puck } = useLoaderData<typeof loader>();
 
   // The category grid and "New arrivals" product grid used to be hardcoded
   // here — now `top_categories`/`latest_products` widgets, seeded onto this
@@ -52,7 +58,11 @@ export default function Home() {
   // the header is now editable/removable through the page builder.
   return (
     <div className="mx-auto max-w-6xl space-y-10 px-4 py-8">
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </div>
   );
 }

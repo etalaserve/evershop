@@ -3,6 +3,8 @@ import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
 import { JsonLd } from '~/components/content/json-ld.js';
 import { RichContent } from '~/components/content/rich-content.js';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { CACHE_TTL, cached } from '~/lib/cache/middleware.js';
 import { gql } from '~/lib/graphql/client.js';
 import { BLOG_POST_QUERY, type BlogPostDetailResponse } from '~/lib/graphql/queries/blog.js';
@@ -33,7 +35,12 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
 
-  return { post: result.blogPostByUrlKey, canonical: canonicalUrl(request), widgets, extras };
+  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+
+  const puck = await loadPuckForRequest(request, ROUTE_ID);
+
+
+  return { post: result.blogPostByUrlKey, canonical: canonicalUrl(request), widgets, extras, puck };
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -49,7 +56,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function BlogPostPage() {
-  const { post, widgets, extras } = useLoaderData<typeof loader>();
+  const { post, widgets, extras, puck } = useLoaderData<typeof loader>();
 
   return (
     <article className="mx-auto max-w-2xl space-y-6 px-4 py-8">
@@ -98,7 +105,11 @@ export default function BlogPostPage() {
           </div>
         </div>
       )}
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </article>
   );
 }

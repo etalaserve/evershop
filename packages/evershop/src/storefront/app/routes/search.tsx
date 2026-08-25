@@ -2,6 +2,8 @@ import { useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs, MetaFunction } from 'react-router';
 import { ProductGrid } from '~/components/catalog/product-grid.js';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { gql } from '~/lib/graphql/client.js';
 import { SEARCH_QUERY, type SearchResponse } from '~/lib/graphql/queries/catalog.js';
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
@@ -26,7 +28,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const extras = await resolveWidgetExtras(widgets, cookie);
 
   if (!keyword) {
-    return { keyword, products: [], total: 0, widgets, extras };
+    // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+    const puck = await loadPuckForRequest(request, ROUTE_ID);
+
+    return { keyword, products: [], total: 0, widgets, extras, puck };
   }
 
   // Search results are per-query and change with the catalog — no cache,
@@ -37,7 +42,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function SearchPage() {
-  const { keyword, products, total, widgets, extras } = useLoaderData<typeof loader>();
+  const { keyword, products, total, widgets, extras, puck } = useLoaderData<typeof loader>();
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
@@ -48,7 +53,11 @@ export default function SearchPage() {
         {keyword && <p className="text-sm text-muted-foreground">{total} products</p>}
       </div>
       <ProductGrid products={products} />
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </div>
   );
 }

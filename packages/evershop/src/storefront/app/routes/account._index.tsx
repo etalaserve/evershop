@@ -2,6 +2,8 @@ import { useLoaderData, useOutletContext } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card.js';
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
+import { PuckArea } from '~/components/widgets/PuckArea.js';
+import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
 import { gql } from '~/lib/graphql/client.js';
 import type { CurrentCustomerResponse } from '~/lib/graphql/queries/customer.js';
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
@@ -21,12 +23,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const widgetData = await gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: ROUTE_ID, changeset });
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
-  return { widgets, extras };
+  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+  const puck = await loadPuckForRequest(request, ROUTE_ID);
+
+  return { widgets, extras, puck };
 }
 
 export default function AccountProfile() {
   const { customer } = useOutletContext<{ customer: Customer }>();
-  const { widgets, extras } = useLoaderData<typeof loader>();
+  const { widgets, extras, puck } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-6">
@@ -49,7 +54,11 @@ export default function AccountProfile() {
           </div>
         </CardContent>
       </Card>
-      <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      {puck ? (
+        <PuckArea data={puck.data} metadata={puck.metadata} />
+      ) : (
+        <WidgetArea areaId="content" widgets={widgets} extras={extras} />
+      )}
     </div>
   );
 }
