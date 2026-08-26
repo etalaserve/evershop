@@ -39,13 +39,16 @@ export default {
       buildUrl('deleteLandingPage', { id: uuid }),
     duplicateApi: ({ uuid }: { uuid: string }) =>
       buildUrl('duplicateLandingPage', { id: uuid }),
-    // NOTE: `?entity=` is currently inert — the RRv7 editor reads only
-    // `?session=` and has no entity-scope support, so this opens the
-    // route-level `landingPageView` widgets rather than this page's own.
-    // Preserved verbatim so the link keeps working once entity scoping is
-    // built (it is a prerequisite of the Puck migration's `scope_urn`).
+    // `?entity=` carries the landing page's URN, not its bare uuid. The Puck
+    // editor stores this value directly as `puck_document.scope_urn`, and a
+    // bare uuid there would be indistinguishable from any other entity type's
+    // — the column exists precisely to say WHICH entity a document is scoped
+    // to. The legacy editor ignores the parameter entirely, so changing its
+    // shape costs nothing there.
     pageBuilderUrl: ({ uuid }: { uuid: string }) =>
-      `${pageBuilderEditUrl('landingPageView')}?entity=${uuid}`,
+      `${pageBuilderEditUrl('landingPageView')}?entity=${encodeURIComponent(
+        PromotionUrn.landingPage(uuid)
+      )}`,
     urn: ({ uuid }: { uuid: string }) => PromotionUrn.landingPage(uuid)
   }
 };

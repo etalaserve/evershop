@@ -5,6 +5,7 @@ import { Puck } from '@puckeditor/core';
 import '@puckeditor/core/puck.css';
 
 import type { AppLoadContext } from '../../../bin/lib/createStorefrontMiddleware.js';
+import { UrnService } from '../../../lib/urn/index.js';
 import { DiscardConfirmDialog } from '~/components/page-builder-admin/DiscardConfirmDialog.js';
 import { PublishDialog } from '~/components/page-builder-admin/PublishDialog.js';
 import { RolloutDialog } from '~/components/page-builder-admin/RolloutDialog.js';
@@ -108,11 +109,22 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
     changesetToken = draft.token;
   }
 
-  // Entity scope: `?entity=<urn>` narrows editing to one entity (a specific
-  // landing page). The legacy RRv7 editor ignored this entirely — every
-  // placement it created hardcoded a null entity — so this is new capability,
-  // not a port. NULL means the route's default document.
-  const scopeUrn = url.searchParams.get('entity');
+  /**
+   * Entity scope: `?entity=<urn>` narrows editing to one entity (a specific
+   * landing page). The legacy RRv7 editor ignored this entirely — every
+   * placement it created hardcoded a null entity — so this is new capability,
+   * not a port. NULL means the route's default document.
+   *
+   * Validated rather than trusted. This value is stored verbatim as
+   * `puck_document.scope_urn` and is part of that table's uniqueness key, so
+   * a malformed one does not fail — it silently creates a second document for
+   * the route that nothing will ever read again. Anything that is not a
+   * well-formed URN falls back to the route default, which is the state the
+   * merchant sees today.
+   */
+  const rawEntity = url.searchParams.get('entity');
+  const scopeUrn =
+    rawEntity && UrnService.isValid(rawEntity) ? rawEntity : null;
 
   const [changesetState, document, settingsData] = await Promise.all([
     gqlAdmin<ChangesetStateResponse>(
@@ -367,6 +379,23 @@ export default function PuckPageBuilder() {
     [themeTokens]
   );
 
+  /**
+   * Human label for the entity scope, e.g. "landing_page · 8f2a1c3d".
+   *
+   * Parsing is guarded: `scopeUrn` reaches the client from a query parameter,
+   * and although the loader validates it, a label is not worth throwing the
+   * whole editor over if that ever changes.
+   */
+  const scopeLabel = useMemo(() => {
+    if (!scopeUrn) return null;
+    try {
+      const { type, uuid } = UrnService.parse(scopeUrn);
+      return `${type} \u00b7 ${uuid.slice(0, 8)}`;
+    } catch {
+      return 'scoped';
+    }
+  }, [scopeUrn]);
+
   const metadata = useMemo(
     () => ({ mode: 'edit' as const, extras, page: { routeId: route.id } }),
     [extras, route.id]
@@ -443,6 +472,25 @@ export default function PuckPageBuilder() {
           overrides={{
             headerActions: () => (
               <div className="flex items-center gap-2">
+                {/*
+                  Which entity this document belongs to. Without it the editor
+                  looks identical whether it is editing one landing page or the
+                  default every landing page falls back to — and the merchant
+                  would have no way to tell which they just changed.
+                */}
+                {scopeUrn ? (
+                  <span className="mr-1 flex items-center gap-2 text-xs">
+                    <span className="rounded bg-secondary px-2 py-0.5 font-medium text-secondary-foreground">
+                      {scopeLabel}
+                    </span>
+                    <a
+                      className="text-muted-foreground underline underline-offset-2"
+                      href={`/admin/page-builder/puck/${route.id}`}
+                    >
+                      Edit route default
+                    </a>
+                  </span>
+                ) : null}
                 <span className="mr-2 text-xs text-muted-foreground">
                   {isSaving
                     ? 'Saving…'
