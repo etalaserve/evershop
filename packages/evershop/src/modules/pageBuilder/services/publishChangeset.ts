@@ -8,6 +8,8 @@ import {
 } from '@evershop/postgres-query-builder';
 import { getConnection } from '../../../lib/postgres/connection.js';
 import type { ChangesetOperationRow } from '../../../types/db/index.js';
+import { UrnService } from '../../../lib/urn/index.js';
+import { findMissingRequired } from '../../../lib/puck/validateDocument.js';
 import { applyOperationToSource } from './applyOperationToSource.js';
 
 /**
@@ -57,6 +59,36 @@ export async function publishChangeset(changesetId: number): Promise<void> {
     // reject UPDATE/DELETE ops whose target was retagged to another theme
     // (spec 04 § 9.9). A violation throws below and rolls back the publish.
     const changesetTheme = ((changeset as any).theme ?? null) as string | null;
+
+    /**
+     * Re-check route guarantees before anything is applied.
+     *
+     * `addChangesetOperation` already rejects a write that would remove a
+     * required component, so reaching here means the op was valid when it was
+     * written and is not now — a requirement added since, or a document that
+     * arrived by another path (a theme install, a converted row). Same
+     * defence-in-depth reasoning as `assertRowThemeMatches`: the write-time
+     * check is the good error message, this is the one that actually protects
+     * the storefront.
+     *
+     * Validating the whole batch before applying any of it means a rejected
+     * publish leaves nothing half-applied, rather than relying on the
+     * transaction rollback to undo a partial commerce page.
+     */
+    for (const op of ops) {
+      const parts = UrnService.parse(op.entity_urn);
+      if (parts.service !== 'cms' || parts.type !== 'puck_document') continue;
+      const missing = findMissingRequired(
+        op.route,
+        (op.new_payload as { data?: unknown } | null)?.data ?? null
+      );
+      if (missing.length > 0) {
+        throw new Error(
+          `Cannot publish: ${op.route} must keep ${missing.join(', ')}`
+        );
+      }
+    }
+
     for (const op of ops) {
       await applyOperationToSource(op, conn, changesetTheme);
     }

@@ -9,6 +9,7 @@ import {
 } from '@evershop/postgres-query-builder';
 import { getConnection } from '../../../../lib/postgres/connection.js';
 import { UrnService } from '../../../../lib/urn/index.js';
+import { findMissingRequired } from '../../../../lib/puck/validateDocument.js';
 import {
   BAD_REQUEST,
   CREATED,
@@ -156,6 +157,33 @@ export default async (
       'cms:puck_document': 'puck_document'
     };
     const targetTable = URN_TABLE[`${parsedUrn.service}:${parsedUrn.type}`];
+
+    /**
+     * Route guarantees. Every page-builder mutation funnels through this
+     * endpoint, which is what makes it the enforcement point — Puck's
+     * per-component `permissions` are a UI affordance, and this endpoint is
+     * reachable directly.
+     *
+     * Rejecting here rather than at publish keeps the changeset always
+     * publishable: a merchant should not be able to accumulate an hour of
+     * edits and only then be told the page cannot ship. Publish re-checks
+     * anyway, since a changeset can hold an op that was valid when written.
+     */
+    if (parsedUrn.type === 'puck_document') {
+      const missing = findMissingRequired(
+        route as string,
+        (newPayload as { data?: unknown } | null)?.data ?? null
+      );
+      if (missing.length > 0) {
+        await rollback(conn);
+        return response.status(BAD_REQUEST).json({
+          error: {
+            status: BAD_REQUEST,
+            message: `This page must keep: ${missing.join(', ')}`
+          }
+        });
+      }
+    }
 
     if (oldPayload == null && newPayload != null) {
       if (typeof newPayload === 'object') {
