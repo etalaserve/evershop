@@ -100,11 +100,29 @@ describe('findMissingRequired', () => {
     expect(findMissingRequired('productView', d, RULES)).toEqual([]);
   });
 
-  it('uses the real table by default', () => {
-    // The shipped table is intentionally empty until each route's commerce
-    // components exist — a rule naming an unregistered component would reject
-    // every save on that route.
-    expect(findMissingRequired('productView', doc([]))).toEqual([]);
+  it('requires add-to-cart on a product page, using the real table', () => {
+    expect(findMissingRequired('productView', doc([]))).toEqual([
+      'product_add_to_cart'
+    ]);
+    expect(
+      findMissingRequired(
+        'productView',
+        doc([{ type: 'product_add_to_cart', props: { id: 'a' } }])
+      )
+    ).toEqual([]);
+  });
+
+  it('never constrains checkout', () => {
+    // Absent by decision, not omission: checkout mounts no editable area,
+    // because a merchant-editable checkout is an unacceptable failure mode.
     expect(Object.keys(REQUIRED_COMPONENTS)).not.toContain('checkout');
+  });
+
+  it('does not require price or gallery', () => {
+    // A page can legitimately omit the gallery (a service, a digital item) or
+    // show price inside a custom block. Requiring more than the minimum turns
+    // a guarantee into an obstruction.
+    expect(REQUIRED_COMPONENTS.productView).not.toContain('product_price');
+    expect(REQUIRED_COMPONENTS.productView).not.toContain('product_gallery');
   });
 });

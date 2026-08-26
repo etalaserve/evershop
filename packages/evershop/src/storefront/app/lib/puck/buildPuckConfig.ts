@@ -133,6 +133,7 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
             metadata?: {
               extras?: Record<string, unknown>;
               mode?: 'render' | 'edit';
+              page?: unknown;
             };
           };
         } & Record<string, unknown>;
@@ -168,6 +169,10 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
           },
           extra: extras[id],
           extras,
+          // Page context (route, and the product on a PDP). Commerce
+          // components have no settings of their own and draw entirely from
+          // this; content widgets ignore it.
+          page: puck?.metadata?.page,
           ...(Object.keys(slots).length > 0 ? { slots } : {})
         };
 

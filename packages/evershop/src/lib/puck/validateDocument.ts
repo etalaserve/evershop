@@ -36,8 +36,16 @@
 
 /** routeId → component types that must be present somewhere in the document. */
 export const REQUIRED_COMPONENTS: Record<string, string[]> = {
-  // Populated as Phase 5 lands each route, e.g.:
-  //   productView: ['ProductAddToCart']
+  /**
+   * A product page must keep its buy button. Everything else on a PDP is
+   * presentation the merchant should be free to rearrange or remove; without
+   * this the product cannot be bought, which is not a layout choice.
+   *
+   * Only add-to-cart, not price or gallery: a page can legitimately omit the
+   * gallery (a service, a digital item) or show price inside a custom block.
+   * Requiring more than the minimum turns a guarantee into an obstruction.
+   */
+  productView: ['product_add_to_cart']
 };
 
 /**

@@ -169,7 +169,16 @@ export const WIDGET_PALETTE: PaletteEntry[] = [
     label: 'Top categories',
     category: 'navigation',
     defaultSettings: { heading: null }
-  }
+  },
+
+  // --- commerce page furniture (Phase 5) ---
+  // One entry each: these have no settings to vary, so there is no second
+  // variant to offer. They draw entirely from the product the page is about,
+  // which is what makes a product page fully composable rather than a fixed
+  // route template.
+  { type: 'product_gallery', variantId: 'product_gallery:default', label: 'Product gallery', category: 'commerce', defaultSettings: {} },
+  { type: 'product_price', variantId: 'product_price:default', label: 'Product price', category: 'commerce', defaultSettings: {} },
+  { type: 'product_add_to_cart', variantId: 'product_add_to_cart:default', label: 'Add to cart', category: 'commerce', defaultSettings: {} }
 ];
 
 export function paletteEntry(variantId: string): PaletteEntry | undefined {

@@ -45,10 +45,14 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const extras = mergeProductAnchorExtras(await resolveWidgetExtras(widgets, cookie), widgets, anchor);
 
   // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
-  // The anchor goes in as metadata, so under Puck the product-anchored types
-  // are resolved by `resolvePuckExtras` like any other widget rather than
-  // merged in afterwards by this route.
-  const puck = await loadPuckForRequest(request, ROUTE_ID, { anchor });
+  // The whole product page context goes in as metadata: the recommendation
+  // arrays so the product-anchored types are resolved by `resolvePuckExtras`
+  // like any other widget rather than merged in afterwards by this route, and
+  // the product entity itself so the commerce components (gallery, price,
+  // add-to-cart) have something to render.
+  const puck = await loadPuckForRequest(request, ROUTE_ID, {
+    product: { ...anchor, detail: result.productByUrlKey }
+  });
 
   return { product: result.productByUrlKey, canonical: canonicalUrl(request), widgets, extras, puck };
 }

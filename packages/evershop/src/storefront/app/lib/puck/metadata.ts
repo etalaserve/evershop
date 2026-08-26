@@ -1,4 +1,10 @@
-import type { ProductCard } from '~/lib/graphql/queries/catalog.js';
+import type {
+  ProductCard,
+  ProductDetailResponse
+} from '~/lib/graphql/queries/catalog.js';
+
+/** The product a PDP is about, as the detail query returns it. */
+export type ProductDetail = ProductDetailResponse['productByUrlKey'];
 
 /**
  * The contract between a route loader and the components inside a Puck
@@ -50,14 +56,25 @@ export interface PuckMetadata {
     /**
      * The product this page is about, on product routes only.
      *
-     * This is what lets the three product-anchored recommendation widgets
-     * (`related_products`, `frequently_bought_together`, `upsell_products`)
-     * stop being a special case — under the widget pipeline the product route
-     * had to merge them in separately via `mergeProductAnchorExtras`, because
-     * their data comes from `PRODUCT_DETAIL_QUERY` rather than a per-widget
-     * query. As metadata they are just an input to the same resolver.
+     * Serves two distinct consumers, which is why it carries both halves:
+     *
+     *  - `detail` is the product entity itself, read by the commerce
+     *    components (gallery, price, add-to-cart). Those render page furniture
+     *    that has no settings of its own — everything they show comes from
+     *    here, so without it they have nothing to draw.
+     *  - the recommendation arrays let the three product-anchored widgets
+     *    (`related_products`, `frequently_bought_together`, `upsell_products`)
+     *    stop being a special case. Under the widget pipeline the product
+     *    route had to merge them in separately via `mergeProductAnchorExtras`,
+     *    because their data comes from `PRODUCT_DETAIL_QUERY` rather than a
+     *    per-widget query. As metadata they are just an input to the same
+     *    resolver.
+     *
+     * Absent in the editor, where there is no real product to render — the
+     * commerce components fall back to an edit-mode placeholder rather than
+     * inventing a sample entity that could be mistaken for real data.
      */
-    product?: ProductAnchor;
+    product?: ProductPageContext;
   };
 }
 
@@ -66,4 +83,9 @@ export interface ProductAnchor {
   relatedProducts: ProductCard[];
   crossSellProducts: ProductCard[];
   upsellProducts: ProductCard[];
+}
+
+/** Everything a product page's components need about the product. */
+export interface ProductPageContext extends ProductAnchor {
+  detail: ProductDetail;
 }

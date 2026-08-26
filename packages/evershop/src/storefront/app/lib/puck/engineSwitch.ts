@@ -1,6 +1,6 @@
 import { loadPuckDocument } from '~/lib/puck/loadPuckDocument.js';
 import { prepareDocumentForRender } from '~/lib/puck/prepareDocument.js';
-import type { PuckMetadata, ProductAnchor } from '~/lib/puck/metadata.js';
+import type { PuckMetadata, ProductPageContext } from '~/lib/puck/metadata.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
 
 /**
@@ -29,8 +29,12 @@ export async function loadPuckForRequest(
   request: Request,
   routeId: string,
   opts: {
-    /** Product routes only — drives the three product-anchored widget types. */
-    anchor?: ProductAnchor;
+    /**
+     * Product routes only. Carries both the product entity the commerce
+     * components render from and the recommendation arrays the three
+     * product-anchored widget types resolve against.
+     */
+    product?: ProductPageContext;
     /** Entity-scoped routes (landing pages); NULL means the route default. */
     scopeUrn?: string | null;
   } = {}
@@ -44,6 +48,6 @@ export async function loadPuckForRequest(
   return prepareDocumentForRender(stored, {
     routeId,
     cookie: request.headers.get('Cookie'),
-    anchor: opts.anchor
+    product: opts.product
   });
 }

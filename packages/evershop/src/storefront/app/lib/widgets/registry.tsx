@@ -1,5 +1,6 @@
 import React from 'react';
 import type { WidgetFragment } from '~/lib/graphql/queries/widgets.js';
+import type { PuckMetadata } from '~/lib/puck/metadata.js';
 
 export interface WidgetComponentProps {
   widget: WidgetFragment;
@@ -28,6 +29,19 @@ export interface WidgetComponentProps {
    * Undefined in the widget pipeline, so that path is unchanged.
    */
   slots?: Record<number, React.ComponentType>;
+  /**
+   * The page context the document is rendering in — route id, and the product
+   * on a PDP. Supplied ONLY by Puck.
+   *
+   * Commerce components (gallery, price, add-to-cart) are page furniture with
+   * no settings of their own: everything they draw comes from the entity the
+   * page is about, which is not something a widget can store. Content widgets
+   * ignore this.
+   *
+   * Absent in the editor, where there is no real entity — components render an
+   * edit-mode placeholder rather than inventing sample data.
+   */
+  page?: PuckMetadata['page'];
 }
 
 export type WidgetComponent = React.ComponentType<WidgetComponentProps>;

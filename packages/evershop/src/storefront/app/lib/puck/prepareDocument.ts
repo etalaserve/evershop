@@ -3,7 +3,7 @@ import { pool } from '../../../../lib/postgres/connection.js';
 import { resolvePuckLinks } from '../../../../lib/puck/resolvePuckLinks.js';
 import { resolvePuckExtras } from '~/lib/widgets/resolvePuckExtras.js';
 import { buildPuckConfig } from '~/lib/puck/buildPuckConfig.js';
-import type { PuckMetadata, ProductAnchor } from '~/lib/puck/metadata.js';
+import type { PuckMetadata, ProductPageContext } from '~/lib/puck/metadata.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
 
 /**
@@ -31,8 +31,8 @@ export async function prepareDocumentForRender(
   ctx: {
     routeId: string;
     cookie: string | null;
-    /** Product routes only — drives the three product-anchored widget types. */
-    anchor?: ProductAnchor;
+    /** Product routes only — the product entity plus its recommendation arrays. */
+    product?: ProductPageContext;
   }
 ): Promise<{ data: PuckDocumentData; metadata: PuckMetadata }> {
   const config = buildPuckConfig();
@@ -45,9 +45,11 @@ export async function prepareDocumentForRender(
     resolveLink(value, loaders)
   );
 
+  // The extras resolver only needs the recommendation arrays; the entity
+  // itself is for the commerce components and travels in metadata.
   const extras = await resolvePuckExtras(resolved, config, {
     cookie: ctx.cookie,
-    anchor: ctx.anchor
+    anchor: ctx.product
   });
 
   return {
@@ -55,7 +57,10 @@ export async function prepareDocumentForRender(
     metadata: {
       mode: 'render',
       extras,
-      page: { routeId: ctx.routeId, ...(ctx.anchor ? { product: ctx.anchor } : {}) }
+      page: {
+        routeId: ctx.routeId,
+        ...(ctx.product ? { product: ctx.product } : {})
+      }
     }
   };
 }

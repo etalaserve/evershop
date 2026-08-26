@@ -1,3 +1,6 @@
+import { ProductAddToCart } from '~/components/widgets/commerce/ProductAddToCart.js';
+import { ProductGallery } from '~/components/widgets/commerce/ProductGallery.js';
+import { ProductPrice } from '~/components/widgets/commerce/ProductPrice.js';
 import { registerStorefrontWidget } from './registry.js';
 import { AnnouncementBar } from '~/components/widgets/AnnouncementBar.js';
 import { Banner } from '~/components/widgets/Banner.js';
@@ -71,3 +74,20 @@ registerStorefrontWidget('featured_blogs', FeaturedBlogs);
 // just resolved without a collection reference (see resolveWidgetExtras.ts).
 registerStorefrontWidget('latest_products', CollectionProducts);
 registerStorefrontWidget('top_categories', TopCategories);
+
+/**
+ * Commerce page furniture (Phase 5).
+ *
+ * These have no settings and render entirely from the entity the page is
+ * about, delivered as `page.product` in Puck's metadata. Registering them here
+ * is what makes a product page fully composable — the merchant can place the
+ * gallery, price and buy button rather than accepting the route template's
+ * fixed arrangement.
+ *
+ * They render a placeholder outside a product page (and in the editor), so
+ * dropping one on the homepage produces a labelled inert block rather than a
+ * crash or a blank.
+ */
+registerStorefrontWidget('product_gallery', ProductGallery);
+registerStorefrontWidget('product_price', ProductPrice);
+registerStorefrontWidget('product_add_to_cart', ProductAddToCart);
