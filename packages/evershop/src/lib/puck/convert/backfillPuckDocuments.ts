@@ -38,6 +38,31 @@ export interface BackfillReport {
     area: string;
     reason: 'unresolved-parent' | 'too-deep';
   }[];
+  /**
+   * Content that converts cleanly but that NO render path will read, so it
+   * would disappear from the storefront at cutover.
+   *
+   * Currently one cause: `route = 'all'`. The widget model lets a placement
+   * target every route at once; the document model is keyed by route, and the
+   * render path looks a document up by the exact route it is rendering, so an
+   * `all` document is written and then never read. The content is still
+   * converted rather than dropped — destroying it would be worse, and it is
+   * what a future globals design would build on — but it is reported here so
+   * the migration cannot quietly lose a merchant's site-wide banner.
+   *
+   * This is deliberately separate from `orphaned`: those are rows the
+   * converter could not represent, these are rows it represented into a place
+   * nothing consumes. Both must be empty (or consciously accepted) before
+   * cutover, and neither is caught by the byte-diff harness on a store that
+   * happens to have no global placements.
+   */
+  unreadable: {
+    route: string;
+    scopeUrn: string | null;
+    theme: string | null;
+    componentCount: number;
+    reason: 'global-route';
+  }[];
 }
 
 interface GroupRow {
@@ -61,7 +86,7 @@ export async function backfillPuckDocuments(
   opts: { areaId?: string; includeDeep?: boolean; dryRun?: boolean } = {}
 ): Promise<BackfillReport> {
   const areaId = opts.areaId ?? 'content';
-  const report: BackfillReport = { documents: [], orphaned: [] };
+  const report: BackfillReport = { documents: [], orphaned: [], unreadable: [] };
 
   // One document per distinct (theme, route, scope). NULLs are significant on
   // both theme and entity_urn — they mean "no custom theme" and "route-level"
@@ -122,6 +147,20 @@ export async function backfillPuckDocuments(
       theme: g.theme,
       componentCount: data.content.length
     });
+
+    // `all` is not a route the storefront ever renders — it is the widget
+    // model's way of saying "every route". `loadPuckDocument` looks up the
+    // concrete route being rendered, so this document is written and never
+    // read again.
+    if (g.route === 'all') {
+      report.unreadable.push({
+        route: g.route,
+        scopeUrn: g.entity_urn,
+        theme: g.theme,
+        componentCount: data.content.length,
+        reason: 'global-route'
+      });
+    }
 
     if (opts.dryRun) continue;
 

@@ -15,6 +15,8 @@ import { EditorPage } from '../../pages/EditorPage.js';
 // has been asserting against a pipeline it no longer reaches. Puck replaces
 // that DOM again, so this is rewritten once, against Puck, rather than twice.
 // Kept rather than deleted: it is the intent spec for that rewrite.
+// PUCK MIGRATION STATUS: COVERED by 00-migration/puck-publish-undo.spec.ts (undo retreats and redo
+// re-advances the route cursor, verified from a fresh request).
 test.skip(true, 'Pending rewrite against the Puck editor (plan Phase 4)');
 
 /**

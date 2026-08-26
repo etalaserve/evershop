@@ -19,6 +19,8 @@ import { PaletteTab } from '../../pages/PaletteTab.js';
 // has been asserting against a pipeline it no longer reaches. Puck replaces
 // that DOM again, so this is rewritten once, against Puck, rather than twice.
 // Kept rather than deleted: it is the intent spec for that rewrite.
+// PUCK MIGRATION STATUS: OBSOLETE. Asserts the synthetic `columnsContainer_<uuid>_col_<n>` area;
+// Puck nests children in slot props and never names an area.
 test.skip(true, 'Pending rewrite against the Puck editor (plan Phase 4)');
 
 /**

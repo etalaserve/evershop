@@ -16,6 +16,9 @@ import { PublishDialog } from '../../pages/PublishDialog.js';
 // has been asserting against a pipeline it no longer reaches. Puck replaces
 // that DOM again, so this is rewritten once, against Puck, rather than twice.
 // Kept rather than deleted: it is the intent spec for that rewrite.
+// PUCK MIGRATION STATUS: COVERED by 00-migration/puck-publish-undo.spec.ts (publish writes the
+// document to published state and the storefront serves it). The dialog
+// count/empty-state assertions are not yet reproduced.
 test.skip(true, 'Pending rewrite against the Puck editor (plan Phase 4)');
 
 /**

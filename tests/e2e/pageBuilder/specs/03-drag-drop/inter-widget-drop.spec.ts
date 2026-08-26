@@ -19,6 +19,8 @@ import { PaletteTab } from '../../pages/PaletteTab.js';
 // has been asserting against a pipeline it no longer reaches. Puck replaces
 // that DOM again, so this is rewritten once, against Puck, rather than twice.
 // Kept rather than deleted: it is the intent spec for that rewrite.
+// PUCK MIGRATION STATUS: OBSOLETE. Asserts midpoint `sort_order` semantics; Puck orders content by
+// array index, so there is no midpoint to compute.
 test.skip(true, 'Pending rewrite against the Puck editor (plan Phase 4)');
 
 /**

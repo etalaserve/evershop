@@ -18,6 +18,9 @@ import { PaletteTab } from '../../pages/PaletteTab.js';
 // has been asserting against a pipeline it no longer reaches. Puck replaces
 // that DOM again, so this is rewritten once, against Puck, rather than twice.
 // Kept rather than deleted: it is the intent spec for that rewrite.
+// PUCK MIGRATION STATUS: PARTLY COVERED by 00-migration/puck-editor-dnd.spec.ts (a real drag writes
+// a changeset op that survives a reload). Puck orders by array index, so the
+// sort_order assertion this spec makes no longer has a subject.
 test.skip(true, 'Pending rewrite against the Puck editor (plan Phase 4)');
 
 /**
