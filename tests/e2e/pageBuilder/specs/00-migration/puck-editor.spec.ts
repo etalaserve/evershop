@@ -90,6 +90,14 @@ test.describe('puck editor', () => {
 
     // Puck's own history controls must not be visible alongside ours.
     await expect(page.locator('.Puck [aria-label="undo"]')).toBeHidden();
+
+    // The remaining changeset surfaces. These are the legacy editor's own
+    // dialogs, reused rather than rebuilt, so the assertion is that they are
+    // actually mounted into Puck's header — a missing override renders
+    // nothing and would otherwise go unnoticed until a merchant looked for
+    // scheduled publishing.
+    await expect(page.getByRole('button', { name: 'Theme', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
   });
 
   test('shows staged changeset edits, without publishing them', async ({

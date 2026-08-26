@@ -7,9 +7,13 @@ import '@puckeditor/core/puck.css';
 import type { AppLoadContext } from '../../../bin/lib/createStorefrontMiddleware.js';
 import { DiscardConfirmDialog } from '~/components/page-builder-admin/DiscardConfirmDialog.js';
 import { PublishDialog } from '~/components/page-builder-admin/PublishDialog.js';
+import { RolloutDialog } from '~/components/page-builder-admin/RolloutDialog.js';
+import { SessionPicker } from '~/components/page-builder-admin/SessionPicker.js';
+import { ThemeSheet } from '~/components/page-builder-admin/ThemeSheet.js';
 import { Alert, AlertDescription } from '~/components/ui/alert.js';
 import { Button } from '~/components/ui/button.js';
 import { getCurrentAdminUser } from '~/lib/admin/session.js';
+import { gql } from '~/lib/graphql/client.js';
 import { gqlAdmin } from '~/lib/graphql/admin-client.js';
 import {
   CHANGESET_STATE_QUERY,
@@ -26,6 +30,11 @@ import { PUCK_CUSTOM_FIELDS } from '~/lib/puck/customFields.js';
 import { loadPuckDocumentForEditing } from '~/lib/puck/loadPuckDocumentForEditing.js';
 import { useStripInertDevStylesheets } from '~/lib/puck/useStripInertDevStylesheets.js';
 import { buildDocumentSaveOp } from '../../../lib/puck/documentOps.js';
+import {
+  STORE_SETTINGS_QUERY,
+  type StoreSettingsResponse
+} from '~/lib/graphql/queries/settings.js';
+import { resolveThemeTokens } from '~/lib/theme/tokens.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
 
 /**
@@ -105,13 +114,14 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
   // not a port. NULL means the route's default document.
   const scopeUrn = url.searchParams.get('entity');
 
-  const [changesetState, document] = await Promise.all([
+  const [changesetState, document, settingsData] = await Promise.all([
     gqlAdmin<ChangesetStateResponse>(
       CHANGESET_STATE_QUERY,
       { id: changesetId, route: routeId },
       cookie
     ),
-    loadPuckDocumentForEditing(routeId, scopeUrn, changesetToken)
+    loadPuckDocumentForEditing(routeId, scopeUrn, changesetToken),
+    gql<StoreSettingsResponse>(STORE_SETTINGS_QUERY)
   ]);
 
   return {
@@ -125,12 +135,13 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
     },
     scopeUrn,
     inRolloutSession: !!sessionToken,
-    document
+    document,
+    themeTokens: resolveThemeTokens(settingsData.setting.themeTokens)
   };
 }
 
 export default function PuckPageBuilder() {
-  const { route, changeset, scopeUrn, inRolloutSession, document } =
+  const { route, changeset, scopeUrn, inRolloutSession, document, themeTokens } =
     useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   useStripInertDevStylesheets();
@@ -139,6 +150,8 @@ export default function PuckPageBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [rolloutOpen, setRolloutOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
   const [extras, setExtras] = useState<Record<string, unknown>>({});
 
   // The config carries the field renderers, so it is editor-only. Rebuilt when
@@ -294,6 +307,66 @@ export default function PuckPageBuilder() {
     [changeset.id, route.id, flush]
   );
 
+  /**
+   * Live theme preview, written straight into Puck's canvas iframe.
+   *
+   * The legacy editor posted a `theme-preview` message to its own iframe and
+   * the storefront bridge applied it. There is no bridge here — the canvas is
+   * Puck's frame, same-origin via `srcDoc` — so the stylesheet is injected
+   * directly. Same effect, one less hop, and nothing to keep in sync.
+   *
+   * Preview only ever touches the canvas document: nothing is persisted until
+   * Apply, so closing the sheet discards it.
+   */
+  const handleThemePreview = useCallback((light: string, dark: string) => {
+    const frame = window.document.getElementById(
+      'preview-frame'
+    ) as HTMLIFrameElement | null;
+    const doc = frame?.contentDocument;
+    if (!doc) return;
+
+    const ID = 'evershop-pb-theme-preview';
+    let tag = doc.getElementById(ID) as HTMLStyleElement | null;
+    if (!tag) {
+      tag = doc.createElement('style');
+      tag.id = ID;
+      // Appended last so it wins the cascade over the mirrored storefront
+      // stylesheet, which is what makes the preview visible at all.
+      doc.head.appendChild(tag);
+    }
+    tag.textContent = `:root{${light}} .dark{${dark}}`;
+  }, []);
+
+  const handleThemeApply = useCallback(
+    async (light: string, dark: string) => {
+      setError(null);
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            themeTokens: {
+              ...themeTokens,
+              customLightCss: light,
+              customDarkCss: dark
+            }
+          })
+        });
+        if (!res.ok) throw new Error(`Theme save failed (${res.status})`);
+        setThemeOpen(false);
+        // The applied theme is a document-level stylesheet rather than widget
+        // data, so no document save can carry it — revalidate so the canvas
+        // picks it up from the server the way a shopper would.
+        revalidator.revalidate();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to apply theme');
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeTokens]
+  );
+
   const metadata = useMemo(
     () => ({ mode: 'edit' as const, extras, page: { routeId: route.id } }),
     [extras, route.id]
@@ -391,6 +464,17 @@ export default function PuckPageBuilder() {
                 >
                   Redo
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => setThemeOpen(true)}>
+                  Theme
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRolloutOpen(true)}
+                  disabled={changeset.operationCount === 0}
+                >
+                  Schedule
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -412,6 +496,26 @@ export default function PuckPageBuilder() {
         />
       </div>
 
+      {/* Lists rollout sessions this admin can join; navigates to ?session=. */}
+      <SessionPicker routeId={route.id} active={!inRolloutSession} />
+
+      <ThemeSheet
+        open={themeOpen}
+        onOpenChange={setThemeOpen}
+        isBusy={isSaving}
+        onPreview={handleThemePreview}
+        onApply={handleThemeApply}
+      />
+      <RolloutDialog
+        open={rolloutOpen}
+        changesetId={changeset.id}
+        editingPlan={null}
+        onOpenChange={setRolloutOpen}
+        onSaved={() => {
+          setRolloutOpen(false);
+          revalidator.revalidate();
+        }}
+      />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}
