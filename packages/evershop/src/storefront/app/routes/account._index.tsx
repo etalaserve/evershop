@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card.j
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
 import { PuckArea } from '~/components/widgets/PuckArea.js';
 import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
+import {
+  CURRENT_CUSTOMER_QUERY,
+  type CurrentCustomerResponse
+} from '~/lib/graphql/queries/customer.js';
 import { gql } from '~/lib/graphql/client.js';
 import type { CurrentCustomerResponse } from '~/lib/graphql/queries/customer.js';
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
@@ -23,8 +27,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const widgetData = await gql<WidgetsForRouteResponse>(WIDGETS_FOR_ROUTE_QUERY, { route: ROUTE_ID, changeset });
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
-  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
-  const puck = await loadPuckForRequest(request, ROUTE_ID);
+  /**
+   * TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+   *
+   * The customer normally reaches this page through the parent layout's outlet
+   * context, which a loader cannot read — so under Puck it has to be fetched
+   * here. Guarded on the engine flag rather than fetched unconditionally: on
+   * the ordinary path the layout has already loaded it, and a second identical
+   * query per account page view would be pure waste.
+   */
+  const wantsPuck = new URL(request.url).searchParams.get('__engine') === 'puck';
+  const customer = wantsPuck
+    ? (await gql<CurrentCustomerResponse>(CURRENT_CUSTOMER_QUERY, {}, cookie))
+        .currentCustomer
+    : null;
+  const puck = await loadPuckForRequest(request, ROUTE_ID, {
+    ...(customer ? { customer: { customer } } : {})
+  });
 
   return { widgets, extras, puck };
 }

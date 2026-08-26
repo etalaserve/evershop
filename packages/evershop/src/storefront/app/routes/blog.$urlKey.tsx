@@ -37,7 +37,9 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
   // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
 
-  const puck = await loadPuckForRequest(request, ROUTE_ID);
+  const puck = await loadPuckForRequest(request, ROUTE_ID, {
+    post: { post: result.blogPostByUrlKey }
+  });
 
 
   return { post: result.blogPostByUrlKey, canonical: canonicalUrl(request), widgets, extras, puck };

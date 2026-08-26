@@ -178,7 +178,16 @@ export const WIDGET_PALETTE: PaletteEntry[] = [
   // route template.
   { type: 'product_gallery', variantId: 'product_gallery:default', label: 'Product gallery', category: 'commerce', defaultSettings: {} },
   { type: 'product_price', variantId: 'product_price:default', label: 'Product price', category: 'commerce', defaultSettings: {} },
-  { type: 'product_add_to_cart', variantId: 'product_add_to_cart:default', label: 'Add to cart', category: 'commerce', defaultSettings: {} }
+  { type: 'product_add_to_cart', variantId: 'product_add_to_cart:default', label: 'Add to cart', category: 'commerce', defaultSettings: {} },
+  { type: 'listing_header', variantId: 'listing_header:default', label: 'Listing header', category: 'commerce', defaultSettings: {} },
+  { type: 'listing_grid', variantId: 'listing_grid:default', label: 'Product listing', category: 'commerce', defaultSettings: {} },
+  { type: 'cart_switch', variantId: 'cart_switch:default', label: 'Cart switch', category: 'commerce', defaultSettings: {} },
+  { type: 'cart_line_items', variantId: 'cart_line_items:default', label: 'Cart items', category: 'commerce', defaultSettings: {} },
+  { type: 'cart_summary', variantId: 'cart_summary:default', label: 'Cart total and checkout', category: 'commerce', defaultSettings: {} },
+  { type: 'blog_post_header', variantId: 'blog_post_header:default', label: 'Post title and byline', category: 'content', defaultSettings: {} },
+  { type: 'blog_post_hero', variantId: 'blog_post_hero:default', label: 'Post hero image', category: 'content', defaultSettings: {} },
+  { type: 'blog_post_body', variantId: 'blog_post_body:default', label: 'Post body', category: 'content', defaultSettings: {} },
+  { type: 'account_profile', variantId: 'account_profile:default', label: 'Customer profile', category: 'commerce', defaultSettings: {} }
 ];
 
 export function paletteEntry(variantId: string): PaletteEntry | undefined {

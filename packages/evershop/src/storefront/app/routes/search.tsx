@@ -29,7 +29,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (!keyword) {
     // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
-    const puck = await loadPuckForRequest(request, ROUTE_ID);
+    const puck = await loadPuckForRequest(request, ROUTE_ID, {
+      listing: { title: 'Search', subtitle: null, products: [], total: 0 }
+    });
 
     return { keyword, products: [], total: 0, widgets, extras, puck };
   }
@@ -38,7 +40,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // unlike the catalog/home pages (CACHE_TTL.page would go stale as soon as
   // a product's stock/price changes and a shopper searched a common term).
   const result = await gql<SearchResponse>(SEARCH_QUERY, { keyword, page });
-  return { keyword, products: result.products.items, total: result.products.total, widgets, extras };
+
+  // This branch previously returned no `puck` at all, so `?__engine=puck`
+  // silently fell back to the widget pipeline for every actual search — the
+  // one case the route exists to serve.
+  const puck = await loadPuckForRequest(request, ROUTE_ID, {
+    listing: {
+      title: `Results for "${keyword}"`,
+      subtitle: `${result.products.total} products`,
+      products: result.products.items,
+      total: result.products.total
+    }
+  });
+
+  return {
+    keyword,
+    products: result.products.items,
+    total: result.products.total,
+    widgets,
+    extras,
+    puck
+  };
 }
 
 export default function SearchPage() {

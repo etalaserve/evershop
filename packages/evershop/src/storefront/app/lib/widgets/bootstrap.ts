@@ -1,3 +1,12 @@
+import { AccountProfile } from '~/components/widgets/commerce/AccountProfile.js';
+import { BlogPostBody } from '~/components/widgets/commerce/BlogPostBody.js';
+import { BlogPostHeader } from '~/components/widgets/commerce/BlogPostHeader.js';
+import { BlogPostHero } from '~/components/widgets/commerce/BlogPostHero.js';
+import { CartLineItems } from '~/components/widgets/commerce/CartLineItems.js';
+import { CartSummary } from '~/components/widgets/commerce/CartSummary.js';
+import { CartSwitch } from '~/components/widgets/commerce/CartSwitch.js';
+import { ListingGrid } from '~/components/widgets/commerce/ListingGrid.js';
+import { ListingHeader } from '~/components/widgets/commerce/ListingHeader.js';
 import { ProductAddToCart } from '~/components/widgets/commerce/ProductAddToCart.js';
 import { ProductGallery } from '~/components/widgets/commerce/ProductGallery.js';
 import { ProductPrice } from '~/components/widgets/commerce/ProductPrice.js';
@@ -91,3 +100,23 @@ registerStorefrontWidget('top_categories', TopCategories);
 registerStorefrontWidget('product_gallery', ProductGallery);
 registerStorefrontWidget('product_price', ProductPrice);
 registerStorefrontWidget('product_add_to_cart', ProductAddToCart);
+
+// Listing furniture — shared by categoryView and catalogSearch, which render
+// the identical shape and differ only in what the heading says.
+registerStorefrontWidget('listing_header', ListingHeader);
+registerStorefrontWidget('listing_grid', ListingGrid);
+
+// Cart furniture. `cart_switch` is a container: the route branched on whether
+// the cart had items, and a document cannot branch, so the branch becomes two
+// named slots the merchant composes.
+registerStorefrontWidget('cart_switch', CartSwitch);
+registerStorefrontWidget('cart_line_items', CartLineItems);
+registerStorefrontWidget('cart_summary', CartSummary);
+
+// Blog post furniture.
+registerStorefrontWidget('blog_post_header', BlogPostHeader);
+registerStorefrontWidget('blog_post_hero', BlogPostHero);
+registerStorefrontWidget('blog_post_body', BlogPostBody);
+
+// Account furniture.
+registerStorefrontWidget('account_profile', AccountProfile);

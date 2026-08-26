@@ -2,6 +2,9 @@ import type {
   ProductCard,
   ProductDetailResponse
 } from '~/lib/graphql/queries/catalog.js';
+import type { CartResponse } from '~/lib/graphql/queries/cart.js';
+import type { BlogPostDetailResponse } from '~/lib/graphql/queries/blog.js';
+import type { CurrentCustomerResponse } from '~/lib/graphql/queries/customer.js';
 
 /** The product a PDP is about, as the detail query returns it. */
 export type ProductDetail = ProductDetailResponse['productByUrlKey'];
@@ -75,7 +78,49 @@ export interface PuckMetadata {
      * inventing a sample entity that could be mistaken for real data.
      */
     product?: ProductPageContext;
+
+    /**
+     * A paginated product listing — category pages and search results.
+     *
+     * Both routes render the identical shape (a heading with a count, then a
+     * grid), so they share one context and one pair of components rather than
+     * duplicating them per route. The route decides what the heading SAYS;
+     * the components only know they are showing a listing.
+     */
+    listing?: ListingPageContext;
+
+    /** The visitor's cart, on the cart page. */
+    cart?: CartPageContext;
+
+    /** The post, on a blog post page. */
+    post?: BlogPostPageContext;
+
+    /** The signed-in customer, on account pages. */
+    customer?: CustomerPageContext;
   };
+}
+
+/** A product listing, shared by category and search. */
+export interface ListingPageContext {
+  title: string;
+  /** Secondary line under the title, e.g. a result count. Null hides it. */
+  subtitle: string | null;
+  products: ProductCard[];
+  total: number;
+}
+
+/** The cart page's context. `isEmpty` is derived once here so components agree on it. */
+export interface CartPageContext {
+  cart: CartResponse['myCart'];
+  isEmpty: boolean;
+}
+
+export interface BlogPostPageContext {
+  post: BlogPostDetailResponse['blogPostByUrlKey'];
+}
+
+export interface CustomerPageContext {
+  customer: CurrentCustomerResponse['currentCustomer'];
 }
 
 /** The already-fetched recommendation arrays a product page hands to the resolver. */

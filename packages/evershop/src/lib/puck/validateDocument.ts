@@ -45,7 +45,17 @@ export const REQUIRED_COMPONENTS: Record<string, string[]> = {
    * gallery (a service, a digital item) or show price inside a custom block.
    * Requiring more than the minimum turns a guarantee into an obstruction.
    */
-  productView: ['product_add_to_cart']
+  productView: ['product_add_to_cart'],
+
+  /**
+   * The cart must keep its total and the way to checkout. Removing it strands
+   * a shopper with items and no route to pay, which is the same class of
+   * breakage as a product page with no add-to-cart.
+   *
+   * `cart_line_items` is NOT required: a merchant could legitimately present
+   * the contents differently. Only the exit is protected.
+   */
+  cart: ['cart_summary']
 };
 
 /**

@@ -170,8 +170,10 @@ export default function PuckPageBuilder() {
   // the registry could have changed — which is never within one mount, hence
   // an empty dependency list.
   const config = useMemo(
-    () => buildPuckConfig({ customFields: PUCK_CUSTOM_FIELDS }),
-    []
+    // `routeId` drives which components are locked against delete/duplicate,
+    // since required components are per route.
+    () => buildPuckConfig({ customFields: PUCK_CUSTOM_FIELDS, routeId: route.id }),
+    [route.id]
   );
 
   /**

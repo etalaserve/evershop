@@ -1,6 +1,13 @@
 import { loadPuckDocument } from '~/lib/puck/loadPuckDocument.js';
 import { prepareDocumentForRender } from '~/lib/puck/prepareDocument.js';
-import type { PuckMetadata, ProductPageContext } from '~/lib/puck/metadata.js';
+import type {
+  BlogPostPageContext,
+  CartPageContext,
+  CustomerPageContext,
+  ListingPageContext,
+  ProductPageContext,
+  PuckMetadata
+} from '~/lib/puck/metadata.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
 
 /**
@@ -35,6 +42,14 @@ export async function loadPuckForRequest(
      * product-anchored widget types resolve against.
      */
     product?: ProductPageContext;
+    /** Category and search — the listing being shown. */
+    listing?: ListingPageContext;
+    /** The cart page. */
+    cart?: CartPageContext;
+    /** A blog post page. */
+    post?: BlogPostPageContext;
+    /** Account pages. */
+    customer?: CustomerPageContext;
     /** Entity-scoped routes (landing pages); NULL means the route default. */
     scopeUrn?: string | null;
   } = {}
@@ -48,6 +63,10 @@ export async function loadPuckForRequest(
   return prepareDocumentForRender(stored, {
     routeId,
     cookie: request.headers.get('Cookie'),
-    product: opts.product
+    product: opts.product,
+    listing: opts.listing,
+    cart: opts.cart,
+    post: opts.post,
+    customer: opts.customer
   });
 }

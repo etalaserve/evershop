@@ -38,7 +38,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
 
-  const puck = await loadPuckForRequest(request, ROUTE_ID);
+  const puck = await loadPuckForRequest(request, ROUTE_ID, {
+    // `isEmpty` is derived once here so `cart_switch` and every cart
+    // component agree on which arm is showing.
+    cart: {
+      cart: result.myCart,
+      isEmpty: !result.myCart?.items || result.myCart.items.length === 0
+    }
+  });
 
 
   return { cart: result.myCart, widgets, extras, puck };

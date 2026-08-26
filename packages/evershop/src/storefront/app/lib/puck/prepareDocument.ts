@@ -3,7 +3,14 @@ import { pool } from '../../../../lib/postgres/connection.js';
 import { resolvePuckLinks } from '../../../../lib/puck/resolvePuckLinks.js';
 import { resolvePuckExtras } from '~/lib/widgets/resolvePuckExtras.js';
 import { buildPuckConfig } from '~/lib/puck/buildPuckConfig.js';
-import type { PuckMetadata, ProductPageContext } from '~/lib/puck/metadata.js';
+import type {
+  BlogPostPageContext,
+  CartPageContext,
+  CustomerPageContext,
+  ListingPageContext,
+  ProductPageContext,
+  PuckMetadata
+} from '~/lib/puck/metadata.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
 
 /**
@@ -33,6 +40,10 @@ export async function prepareDocumentForRender(
     cookie: string | null;
     /** Product routes only — the product entity plus its recommendation arrays. */
     product?: ProductPageContext;
+    listing?: ListingPageContext;
+    cart?: CartPageContext;
+    post?: BlogPostPageContext;
+    customer?: CustomerPageContext;
   }
 ): Promise<{ data: PuckDocumentData; metadata: PuckMetadata }> {
   const config = buildPuckConfig();
@@ -57,9 +68,16 @@ export async function prepareDocumentForRender(
     metadata: {
       mode: 'render',
       extras,
+      // Each key is omitted rather than set to undefined when absent, so a
+      // component testing `page.cart` cannot be fooled by a present-but-empty
+      // context on a route that has none.
       page: {
         routeId: ctx.routeId,
-        ...(ctx.product ? { product: ctx.product } : {})
+        ...(ctx.product ? { product: ctx.product } : {}),
+        ...(ctx.listing ? { listing: ctx.listing } : {}),
+        ...(ctx.cart ? { cart: ctx.cart } : {}),
+        ...(ctx.post ? { post: ctx.post } : {}),
+        ...(ctx.customer ? { customer: ctx.customer } : {})
       }
     }
   };

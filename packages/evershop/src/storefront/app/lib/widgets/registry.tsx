@@ -42,6 +42,15 @@ export interface WidgetComponentProps {
    * edit-mode placeholder rather than inventing sample data.
    */
   page?: PuckMetadata['page'];
+  /**
+   * Pre-rendered children for containers whose regions are named rather than
+   * indexed — `cart_switch`'s `whenEmpty`/`whenFilled`. Supplied ONLY by Puck.
+   *
+   * Indexed columns arrive as `slots`; these are separate because a name
+   * carries meaning a column index cannot, and a container that mixed the two
+   * would have no way to tell which region it was handed.
+   */
+  namedSlots?: Record<string, React.ComponentType>;
 }
 
 export type WidgetComponent = React.ComponentType<WidgetComponentProps>;

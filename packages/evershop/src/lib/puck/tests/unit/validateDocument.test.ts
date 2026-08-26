@@ -112,6 +112,20 @@ describe('findMissingRequired', () => {
     ).toEqual([]);
   });
 
+  it('requires the checkout path on the cart page', () => {
+    // Removing it strands a shopper with items and no way to pay.
+    expect(findMissingRequired('cart', doc([]))).toEqual(['cart_summary']);
+    expect(
+      findMissingRequired('cart', doc([{ type: 'cart_summary', props: { id: 'a' } }]))
+    ).toEqual([]);
+  });
+
+  it('does not require the cart line items', () => {
+    // A merchant could legitimately present the contents differently; only
+    // the exit is protected.
+    expect(REQUIRED_COMPONENTS.cart).not.toContain('cart_line_items');
+  });
+
   it('never constrains checkout', () => {
     // Absent by decision, not omission: checkout mounts no editable area,
     // because a merchant-editable checkout is an unacceptable failure mode.

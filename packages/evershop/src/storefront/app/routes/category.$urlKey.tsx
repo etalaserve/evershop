@@ -40,7 +40,17 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
   // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
 
-  const puck = await loadPuckForRequest(request, ROUTE_ID);
+  const puck = await loadPuckForRequest(request, ROUTE_ID, {
+    // Category and search share one listing context, so one pair of
+    // components serves both. The route owns the wording; the components own
+    // the presentation.
+    listing: {
+      title: result.categoryByUrlKey.name,
+      subtitle: `${result.categoryByUrlKey.products.total} products`,
+      products: result.categoryByUrlKey.products.items,
+      total: result.categoryByUrlKey.products.total
+    }
+  });
 
 
   return { category: result.categoryByUrlKey, canonical: canonicalUrl(request), widgets, extras, puck };

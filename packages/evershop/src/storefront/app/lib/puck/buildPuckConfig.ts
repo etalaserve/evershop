@@ -8,6 +8,7 @@ import {
 import { WIDGET_FIELD_CONFIGS } from '~/lib/page-builder-admin/fieldConfig.js';
 import { WIDGET_PALETTE } from '~/lib/page-builder-admin/widgetPalette.js';
 import { getStorefrontWidget } from '~/lib/widgets/registry.js';
+import { REQUIRED_COMPONENTS } from '../../../../lib/puck/validateDocument.js';
 
 /**
  * Build the Puck `Config` from EverShop's existing sources of truth:
@@ -30,17 +31,36 @@ import { getStorefrontWidget } from '~/lib/widgets/registry.js';
  * a palette-level concern — the drawer applies a preset on insert.
  */
 
-/** Widget types that host nested children via `columnsContainer_<uuid>_col_<n>`. */
-const CONTAINER_SLOTS: Record<string, number> = {
+/**
+ * Types that host nested children.
+ *
+ * A number means N indexed slots (`col0`…`colN-1`), mirroring the widget
+ * model's `columnsContainer_<uuid>_col_<n>` areas. An array means NAMED slots,
+ * for containers whose regions mean different things — `cart_switch` shows one
+ * or the other depending on whether the cart has items, so calling them `col0`
+ * and `col1` would leave a merchant guessing which is which.
+ */
+const CONTAINER_SLOTS: Record<string, number | string[]> = {
   // Columns renders `columnCount` columns (defaults to 2). Slots are declared
   // statically because a Puck field set is fixed per component, so declare the
   // maximum the ratio parser supports; unused columns simply render empty.
   columns: 4,
   // Section is the degenerate single-column container — always `_col_0`.
-  section: 1
+  section: 1,
+  // The cart page renders one of two mutually exclusive states. The route
+  // branched on that and mounted its widget area twice; a document cannot
+  // branch, so the two states become named slots of one component. Both are
+  // rendered in the editor so a merchant can compose either.
+  cart_switch: ['whenEmpty', 'whenFilled']
 };
 
 export interface BuildConfigOptions {
+  /**
+   * The route being edited. Required components are per route, so without it
+   * no component can be locked — a config built for rendering does not need
+   * one, since permissions are an editor affordance only.
+   */
+  routeId?: string;
   /**
    * Renderers for the four field kinds Puck has no primitive for. Supplied by
    * the editor; omitted on the server, where `Render` never touches field UI.
@@ -50,6 +70,8 @@ export interface BuildConfigOptions {
 
 export interface PuckComponentConfig {
   label?: string;
+  /** Puck's per-component action gating. Omitted for components with no restrictions. */
+  permissions?: { delete?: boolean; duplicate?: boolean };
   fields: Record<string, PuckField>;
   defaultProps?: Record<string, unknown>;
   render: (props: Record<string, unknown>) => unknown;
@@ -61,10 +83,18 @@ export interface PuckConfig {
 
 /** Slot fields for a container type, keyed `col0`, `col1`, … to mirror the synthetic area's column index. */
 function slotFields(type: string): Record<string, PuckField> {
-  const count = CONTAINER_SLOTS[type];
-  if (!count) return {};
+  const spec = CONTAINER_SLOTS[type];
+  if (!spec) return {};
   const out: Record<string, PuckField> = {};
-  for (let i = 0; i < count; i += 1) {
+
+  if (Array.isArray(spec)) {
+    for (const name of spec) {
+      out[name] = { type: 'slot' };
+    }
+    return out;
+  }
+
+  for (let i = 0; i < spec; i += 1) {
     // MUST be declared as a field. Without this Puck hands the raw child array
     // to render() and React throws "Element type is invalid… got: object" —
     // the container looks fine while dropping every child. Verified in
@@ -95,6 +125,23 @@ function paletteDefaults(): Map<string, { label: string; defaultSettings: Record
 
 export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
   const renderers = opts.customFields ?? {};
+  /**
+   * Components this route may not lose. Hiding delete and duplicate is the
+   * first of the guarantee's layers and the only one a merchant ever sees —
+   * it stops them reaching for an action that would be refused anyway, which
+   * is a better experience than a 400 after the fact.
+   *
+   * It is NOT the guarantee. `addChangesetOperation` and publish both
+   * re-check, because this is UI state and the endpoint is reachable
+   * directly.
+   *
+   * Duplicate is blocked alongside delete so a route cannot end up with two
+   * add-to-cart buttons — the rule only asserts at least one exists, and two
+   * is a broken page the validator would happily accept.
+   */
+  const locked = new Set(
+    opts.routeId ? (REQUIRED_COMPONENTS[opts.routeId] ?? []) : []
+  );
   const defaults = paletteDefaults();
   const components: Record<string, PuckComponentConfig> = {};
 
@@ -109,6 +156,9 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
 
     components[type] = {
       label: meta.label,
+      ...(locked.has(type)
+        ? { permissions: { delete: false, duplicate: false } }
+        : {}),
       fields: {
         // `text_block` has no fieldConfig — its content is an EditorJS block
         // tree, edited through the raw-JSON escape hatch today. It still needs
@@ -144,12 +194,20 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
         // slot field's value with a renderable component, so leaving `col0` in
         // `rawSettings` would hand a React component to a widget expecting a
         // plain setting.
+        const namedSlotSpec = CONTAINER_SLOTS[type];
+        const namedSlotKeys = new Set(
+          Array.isArray(namedSlotSpec) ? namedSlotSpec : []
+        );
+
         const slots: Record<number, React.ComponentType> = {};
+        const namedSlots: Record<string, React.ComponentType> = {};
         const settings: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(rest)) {
           const m = /^col(\d+)$/.exec(key);
           if (m && typeof value === 'function') {
             slots[Number.parseInt(m[1], 10)] = value as React.ComponentType;
+          } else if (namedSlotKeys.has(key) && typeof value === 'function') {
+            namedSlots[key] = value as React.ComponentType;
           } else {
             settings[key] = value;
           }
@@ -173,7 +231,8 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
           // components have no settings of their own and draw entirely from
           // this; content widgets ignore it.
           page: puck?.metadata?.page,
-          ...(Object.keys(slots).length > 0 ? { slots } : {})
+          ...(Object.keys(slots).length > 0 ? { slots } : {}),
+          ...(Object.keys(namedSlots).length > 0 ? { namedSlots } : {})
         };
 
         // `createElement` rather than calling `Component(...)` directly: a
