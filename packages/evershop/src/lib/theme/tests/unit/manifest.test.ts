@@ -90,7 +90,7 @@ describe('validateManifest', () => {
 
   test('invalid widget uuid', async () => {
     const m = validManifest();
-    m.widgets[0].uuid = 'not-a-uuid';
+    m.widgets![0].uuid = 'not-a-uuid';
     const errs = await validateManifest(m, ctx());
     expect(errs.some((e) => e.scope === 'widget' && /UUID v4/.test(e.message))).toBe(
       true
@@ -99,7 +99,7 @@ describe('validateManifest', () => {
 
   test('empty widget type', async () => {
     const m = validManifest();
-    m.widgets[0].type = '';
+    m.widgets![0].type = '';
     const errs = await validateManifest(m, ctx());
     expect(errs.some((e) => e.scope === 'widget' && /type/.test(e.message))).toBe(
       true
@@ -108,7 +108,7 @@ describe('validateManifest', () => {
 
   test('non-object widget settings', async () => {
     const m = validManifest();
-    (m.widgets[0] as { settings: unknown }).settings = 'x';
+    (m.widgets![0] as { settings: unknown }).settings = 'x';
     const errs = await validateManifest(m, ctx());
     expect(
       errs.some((e) => e.scope === 'widget' && /settings/.test(e.message))
@@ -117,7 +117,7 @@ describe('validateManifest', () => {
 
   test('placement references unknown widget', async () => {
     const m = validManifest();
-    m.placements[0].widget_instance_uuid = W2;
+    m.placements![0].widget_instance_uuid = W2;
     const errs = await validateManifest(m, ctx());
     expect(
       errs.some((e) => e.scope === 'placement' && /no matching widget/.test(e.message))
@@ -126,7 +126,7 @@ describe('validateManifest', () => {
 
   test('placement with non-numeric sort_order', async () => {
     const m = validManifest();
-    (m.placements[0] as { sort_order: unknown }).sort_order = 'x';
+    (m.placements![0] as { sort_order: unknown }).sort_order = 'x';
     const errs = await validateManifest(m, ctx());
     expect(
       errs.some((e) => e.scope === 'placement' && /sort_order/.test(e.message))
@@ -135,7 +135,7 @@ describe('validateManifest', () => {
 
   test('placement with entity_urn is rejected', async () => {
     const m = validManifest();
-    (m.placements[0] as { entity_urn?: unknown }).entity_urn =
+    (m.placements![0] as { entity_urn?: unknown }).entity_urn =
       'urn:evershop:cms:page:x';
     const errs = await validateManifest(m, ctx());
     expect(
@@ -145,14 +145,14 @@ describe('validateManifest', () => {
 
   test('duplicate widget uuid is a cross-record error', async () => {
     const m = validManifest();
-    m.widgets.push({ uuid: W1, type: 'text_block', name: 'Dup', settings: {} });
+    m.widgets!.push({ uuid: W1, type: 'text_block', name: 'Dup', settings: {} });
     const errs = await validateManifest(m, ctx());
     expect(errs.some((e) => e.scope === 'cross-record')).toBe(true);
   });
 
   test('a uuid used by both a widget and a placement is a cross-record error', async () => {
     const m = validManifest();
-    m.placements[0].uuid = W1; // collide with the widget's uuid
+    m.placements![0].uuid = W1; // collide with the widget's uuid
     const errs = await validateManifest(m, ctx());
     expect(
       errs.some((e) => e.scope === 'cross-record' && /both/.test(e.message))
@@ -161,7 +161,7 @@ describe('validateManifest', () => {
 
   test('synthetic-area parent missing from widgets[]', async () => {
     const m = validManifest();
-    m.placements[0].area = `columnsContainer_${COLS}_col_0`;
+    m.placements![0].area = `columnsContainer_${COLS}_col_0`;
     const errs = await validateManifest(m, ctx());
     expect(
       errs.some((e) => e.scope === 'placement' && /not in widgets/.test(e.message))
@@ -171,8 +171,8 @@ describe('validateManifest', () => {
   test('synthetic-area parent of the wrong type', async () => {
     const m = validManifest();
     // Parent exists but is a text_block, not columns.
-    m.widgets.push({ uuid: COLS, type: 'text_block', name: 'NotCols', settings: {} });
-    m.placements.push({
+    m.widgets!.push({ uuid: COLS, type: 'text_block', name: 'NotCols', settings: {} });
+    m.placements!.push({
       uuid: P2,
       widget_instance_uuid: W1,
       route: 'all',
@@ -187,8 +187,8 @@ describe('validateManifest', () => {
 
   test('synthetic-area parent of type columns is accepted', async () => {
     const m = validManifest();
-    m.widgets.push({ uuid: COLS, type: 'columns', name: 'Cols', settings: {} });
-    m.placements.push({
+    m.widgets!.push({ uuid: COLS, type: 'columns', name: 'Cols', settings: {} });
+    m.placements!.push({
       uuid: P2,
       widget_instance_uuid: W1,
       route: 'all',

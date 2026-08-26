@@ -233,8 +233,8 @@ async function runInstallPipeline(
       console.log(
         kleur.bold(
           `Dry run — '${themeId}' is not yet installed; activation would do a ` +
-            `fresh install of ${manifest.widgets.length} widgets, ` +
-            `${manifest.placements.length} placements.`
+            `fresh install of ${(manifest.widgets ?? []).length} widgets, ` +
+            `${(manifest.placements ?? []).length} placements.`
         )
       );
     } else {

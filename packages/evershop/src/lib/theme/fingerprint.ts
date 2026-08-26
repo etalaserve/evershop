@@ -2,7 +2,8 @@ import { canonicalize } from './canonicalize.js';
 import type { Manifest } from './manifest.js';
 
 /**
- * Fingerprint a manifest's CONTENT only — `widgets[]` + `placements[]`.
+ * Fingerprint a manifest's CONTENT only — `widgets[]`, `placements[]` and
+ * `documents[]`.
  *
  * Excludes metadata (`theme_name`, `version`, and any future
  * description/author/license fields). Used by the upgrade path to tell whether
@@ -15,6 +16,17 @@ import type { Manifest } from './manifest.js';
 export function contentFingerprint(manifest: Manifest): string {
   return canonicalize({
     widgets: manifest.widgets,
-    placements: manifest.placements
+    placements: manifest.placements,
+    /**
+     * Schema 2's content. Without this every schema-2 manifest fingerprints
+     * identically — they all have `widgets: undefined, placements: undefined`
+     * — so drift at an unchanged version would go unreported for exactly the
+     * themes that now carry the content.
+     *
+     * Included unconditionally rather than switching on the schema: a schema-1
+     * manifest has no `documents` key, so the fingerprint of every existing
+     * theme is unchanged and no store sees spurious drift after upgrading.
+     */
+    documents: manifest.documents
   });
 }

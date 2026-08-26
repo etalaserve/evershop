@@ -30,16 +30,46 @@ export interface PlacementRecord {
   sort_order: number;
 }
 
+/**
+ * One Puck document a theme ships — the schema-2 unit of content.
+ *
+ * Replaces the widget/placement pair: a document already carries its own
+ * nesting and ordering, so the cross-record integrity rules that existed to
+ * stop a placement referencing a missing widget have nothing to check.
+ */
+export interface DocumentRecord {
+  route: string;
+  /** Entity scope, or null for the route's default document. */
+  scope_urn?: string | null;
+  /** A Puck `Data` — `{ root, content }`. */
+  data: unknown;
+}
+
 export interface Manifest {
   theme_name: string;
+  /**
+   * Content schema version. Absent means 1, so every theme published before
+   * the Puck migration keeps installing untouched — that reader is retained
+   * permanently, not as a deprecation window: a theme is an artefact someone
+   * else published and we do not get to expire it.
+   *
+   * A schema-1 manifest is CONVERTED to documents at install time rather than
+   * writing widget rows, so both kinds of theme produce the same thing and
+   * there is only one install path to keep correct.
+   */
+  schema?: 1 | 2;
   /**
    * The theme content's version — a valid SemVer string (spec 04 § 5.2).
    * Load-bearing: installs/upgrades are gated on it (only a strictly higher
    * version upgrades; downgrades are refused). See `install.ts`.
    */
   version: string;
-  widgets: WidgetRecord[];
-  placements: PlacementRecord[];
+  /** Schema 1 only. */
+  widgets?: WidgetRecord[];
+  /** Schema 1 only. */
+  placements?: PlacementRecord[];
+  /** Schema 2 only. */
+  documents?: DocumentRecord[];
   /**
    * Metafield definitions this theme declares (theme-metafields design).
    * Deliberately OUTSIDE the widget SemVer/snapshot protocol: entries are
@@ -50,7 +80,14 @@ export interface Manifest {
 }
 
 export interface ValidationError {
-  scope: 'top-level' | 'widget' | 'placement' | 'cross-record' | 'db' | 'metafield';
+  scope:
+    | 'top-level'
+    | 'widget'
+    | 'placement'
+    | 'document'
+    | 'cross-record'
+    | 'db'
+    | 'metafield';
   index?: number;
   uuid?: string;
   message: string;
@@ -103,6 +140,22 @@ export async function readManifest(themeDir: string): Promise<Manifest | null> {
 }
 
 /**
+ * Which content schema a manifest uses.
+ *
+ * Inferred rather than demanded, because every theme published before the
+ * Puck migration predates the field and must keep installing. An explicit
+ * `schema` wins; otherwise the presence of `documents` marks a schema-2
+ * manifest, and anything else is schema 1 — including a manifest with no
+ * content at all, which stays schema 1 so its (empty) install path is the
+ * long-standing one.
+ */
+export function manifestSchema(manifest: Manifest): 1 | 2 {
+  if (manifest.schema === 2) return 2;
+  if (manifest.schema === 1) return 1;
+  return Array.isArray(manifest.documents) ? 2 : 1;
+}
+
+/**
  * Validate a manifest against spec § 5.5. Returns every error found (empty
  * array = pass) so the CLI can print them all at once.
  */
@@ -125,8 +178,61 @@ export async function validateManifest(
       )}`
     });
   }
+  if (manifestSchema(manifest) === 2) {
+    // Schema 2 carries documents instead of widget/placement pairs. There are
+    // no cross-record rules to enforce: a document already contains its own
+    // nesting and ordering, so the whole class of "placement references a
+    // widget that isn't here" cannot arise.
+    if (!Array.isArray(manifest.documents)) {
+      errors.push({
+        scope: 'top-level',
+        message: 'documents must be an array for a schema 2 manifest'
+      });
+      return errors;
+    }
+    manifest.documents.forEach((doc, index) => {
+      if (typeof doc?.route !== 'string' || doc.route.length === 0) {
+        errors.push({
+          scope: 'document',
+          index,
+          message: 'route is required and must be a non-empty string'
+        });
+      }
+      if (
+        doc?.scope_urn !== undefined &&
+        doc.scope_urn !== null &&
+        typeof doc.scope_urn !== 'string'
+      ) {
+        errors.push({
+          scope: 'document',
+          index,
+          message: 'scope_urn must be a string or null'
+        });
+      }
+      // `data` is checked for SHAPE only. Whether each component type is
+      // registered is a render-time concern, exactly as widget settings
+      // schemas were: a theme may legitimately ship content for a component
+      // an extension provides.
+      const data = doc?.data as { content?: unknown } | undefined;
+      if (!data || typeof data !== 'object' || !Array.isArray(data.content)) {
+        errors.push({
+          scope: 'document',
+          index,
+          message: 'data must be a Puck document with a content array'
+        });
+      }
+    });
+    return errors;
+  }
+
   const widgetsOk = Array.isArray(manifest.widgets);
   const placementsOk = Array.isArray(manifest.placements);
+  // Narrowed once for the whole schema-1 section below. Both are optional on
+  // the type because a schema-2 manifest carries neither; reaching here means
+  // this manifest is schema 1, where a missing array is already reported as a
+  // top-level error just above.
+  const widgets = manifest.widgets ?? [];
+  const placements = manifest.placements ?? [];
   if (!widgetsOk) {
     errors.push({ scope: 'top-level', message: 'widgets must be an array' });
   }
@@ -153,7 +259,7 @@ export async function validateManifest(
   if (!widgetsOk || !placementsOk) return errors;
 
   const widgetUuids = new Set<string>();
-  manifest.widgets.forEach((w, index) => {
+  (widgets ?? []).forEach((w, index) => {
     if (!isUuidV4(w?.uuid)) {
       errors.push({
         scope: 'widget',
@@ -180,7 +286,7 @@ export async function validateManifest(
   });
 
   const placementUuids = new Set<string>();
-  manifest.placements.forEach((p, index) => {
+  (placements ?? []).forEach((p, index) => {
     if (!isUuidV4(p?.uuid)) {
       errors.push({
         scope: 'placement',
@@ -232,7 +338,7 @@ export async function validateManifest(
 
   // Cross-record uniqueness: no dup widget uuids, no dup placement uuids, and
   // no uuid appearing in both arrays.
-  if (widgetUuids.size !== manifest.widgets.filter((w) => isUuidV4(w?.uuid)).length) {
+  if (widgetUuids.size !== widgets.filter((w) => isUuidV4(w?.uuid)).length) {
     errors.push({
       scope: 'cross-record',
       message: 'duplicate uuid(s) within widgets[]'
@@ -240,7 +346,7 @@ export async function validateManifest(
   }
   if (
     placementUuids.size !==
-    manifest.placements.filter((p) => isUuidV4(p?.uuid)).length
+    placements.filter((p) => isUuidV4(p?.uuid)).length
   ) {
     errors.push({
       scope: 'cross-record',
@@ -260,11 +366,11 @@ export async function validateManifest(
   // Synthetic-area parent: a child placement's area encodes its parent
   // container's uuid, which must exist in widgets[] and be a `columns` widget.
   const widgetTypeByUuid = new Map(
-    manifest.widgets
+    widgets
       .filter((w) => isUuidV4(w?.uuid))
       .map((w) => [w.uuid, w.type])
   );
-  manifest.placements.forEach((p, index) => {
+  (placements ?? []).forEach((p, index) => {
     const match = typeof p?.area === 'string' && p.area.match(SYNTHETIC_AREA_RE);
     if (!match) return;
     const parentUuid = match[1];
@@ -285,7 +391,7 @@ export async function validateManifest(
 
   // DB collision: a widget uuid that already exists under a DIFFERENT theme
   // can't be claimed by this install.
-  const dbUuids = manifest.widgets
+  const dbUuids = widgets
     .map((w) => w?.uuid)
     .filter((u): u is string => isUuidV4(u));
   if (dbUuids.length > 0) {
@@ -299,7 +405,7 @@ export async function validateManifest(
         r.theme ?? null
       ])
     );
-    for (const w of manifest.widgets) {
+    for (const w of widgets) {
       if (!isUuidV4(w?.uuid)) continue;
       const t = existingTheme.get(w.uuid);
       if (t !== undefined && t !== ctx.themeId) {
@@ -326,7 +432,9 @@ export function warnUnknownTypes(
   warn: (message: string) => void
 ): void {
   if (knownTypes.size === 0) return; // empty DB — can't tell typos from new modules
-  for (const w of manifest.widgets) {
+  // Schema 2 ships documents, not widget records, so there are no declared
+  // types to warn about here.
+  for (const w of manifest.widgets ?? []) {
     if (!knownTypes.has(w.type)) {
       warn(
         `[WARN] widget type '${w.type}' has never been used on this install. ` +

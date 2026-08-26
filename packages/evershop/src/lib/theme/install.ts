@@ -17,12 +17,20 @@ import {
   PlanOp
 } from './diff.js';
 import { contentFingerprint } from './fingerprint.js';
+import { manifestDocuments } from './documents.js';
 import type { Manifest, PlacementRecord, WidgetRecord } from './manifest.js';
 
 export interface InstallOpts {
   themeId: string;
   manifest: Manifest;
   pool: Pool;
+  /**
+   * Non-blocking diagnostics for the caller to surface — currently theme
+   * content that could not be converted to a document. Optional so existing
+   * callers keep working; when absent the warning is dropped, which is the
+   * same posture `warnUnknownTypes` already takes.
+   */
+  warn?: (message: string) => void;
 }
 
 export interface InstallResult {
@@ -176,9 +184,53 @@ async function applyOps(
   }
 }
 
+/**
+ * Write a theme's Puck documents.
+ *
+ * Both schemas funnel here — schema 2 ships documents, schema 1 is converted
+ * into the same shape by `manifestDocuments` — so there is one install path
+ * rather than two that can drift.
+ *
+ * Upserts on `(route, scope_urn, theme)`, the table's own uniqueness key, so
+ * re-running an install is idempotent. That matters because the widget path it
+ * replaces deliberately adopts pre-existing rows rather than colliding on
+ * them: an author who built content in the page builder, exported it, and then
+ * ran `theme:active` against the same database must not be told their own
+ * content conflicts with itself.
+ */
+async function installDocuments(
+  conn: PoolClient,
+  themeId: string,
+  manifest: Manifest,
+  warn?: (message: string) => void
+): Promise<number> {
+  const { documents, orphaned } = manifestDocuments(manifest);
+
+  for (const o of orphaned) {
+    // Loud rather than swallowed: content lost during conversion would leave
+    // the theme looking installed and being wrong, with nothing to tell the
+    // merchant what should have been there.
+    warn?.(
+      `[WARN] theme content in area '${o.area}' could not be converted (${o.reason}) and was not installed.`
+    );
+  }
+
+  for (const doc of documents) {
+    await conn.query(
+      `INSERT INTO puck_document (route, scope_urn, theme, data)
+       VALUES ($1, $2, $3, $4::jsonb)
+       ON CONFLICT (route, COALESCE(scope_urn,''), COALESCE(theme,''))
+       DO UPDATE SET data = EXCLUDED.data`,
+      [doc.route, doc.scope_urn ?? null, themeId, JSON.stringify(doc.data)]
+    );
+  }
+
+  return documents.length;
+}
+
 function freshInstallOps(manifest: Manifest): PlanOp[] {
   return [
-    ...manifest.widgets.map(
+    ...(manifest.widgets ?? []).map(
       (w): PlanOp => ({
         table: 'widget_instance',
         op: 'INSERT',
@@ -186,7 +238,7 @@ function freshInstallOps(manifest: Manifest): PlanOp[] {
         payload: { uuid: w.uuid, type: w.type, name: w.name, settings: w.settings }
       })
     ),
-    ...manifest.placements.map(
+    ...(manifest.placements ?? []).map(
       (p): PlanOp => ({
         table: 'widget_placement',
         op: 'INSERT',
@@ -240,6 +292,10 @@ export async function installOrUpgrade(
           : !liveDb.placements.has(op.uuid)
       );
       await applyOps(conn, opts.themeId, toInsert);
+      // The content model the storefront actually reads. Widget rows are still
+      // written above so the legacy pipeline keeps serving routes that have
+      // not cut over yet; both are removed together at cutover.
+      await installDocuments(conn, opts.themeId, opts.manifest, opts.warn);
       await conn.query(
         `INSERT INTO theme_install_state (theme, snapshot) VALUES ($1, $2::jsonb)`,
         [opts.themeId, JSON.stringify(opts.manifest)]
@@ -262,8 +318,8 @@ export async function installOrUpgrade(
         counts,
         conflicts: [],
         adopted: {
-          widgets: opts.manifest.widgets.length - widgetsAdded,
-          placements: opts.manifest.placements.length - placementsAdded
+          widgets: (opts.manifest.widgets ?? []).length - widgetsAdded,
+          placements: (opts.manifest.placements ?? []).length - placementsAdded
         }
       };
     }
@@ -313,6 +369,12 @@ export async function installOrUpgrade(
     const liveDb = await loadLiveDbForTheme(conn, opts.themeId);
     const diff = diffManifest(snapshot, opts.manifest, liveDb);
     await applyOps(conn, opts.themeId, diff.ops);
+    // Documents are replaced wholesale on upgrade rather than diffed.
+    // Document-level granularity is the accepted cost of the migration: a
+    // three-way merge of a JSON tree is a research project whose failure mode
+    // is a merchant's page silently mangled, which is worse than an upgrade
+    // that plainly takes the theme's version of a page.
+    await installDocuments(conn, opts.themeId, opts.manifest, opts.warn);
     await conn.query(
       `UPDATE theme_install_state SET snapshot = $2::jsonb, updated_at = NOW()
        WHERE theme = $1`,

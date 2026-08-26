@@ -94,11 +94,43 @@ export async function exportToManifest(opts: ExportOpts): Promise<Manifest> {
     }
   }
 
+  /**
+   * Documents are the schema-2 content, exported straight from the table the
+   * storefront reads.
+   *
+   * The widget arrays are still emitted alongside them. During the migration
+   * both models are live — the legacy pipeline still serves routes that have
+   * not cut over — and an export that dropped one of them would produce a
+   * theme that installs into only half the store. They go away together at
+   * cutover, when the widget tables do.
+   */
+  const documentRows = await opts.pool.query<{
+    route: string;
+    scope_urn: string | null;
+    data: unknown;
+  }>(
+    `SELECT route, scope_urn, data
+     FROM puck_document
+     WHERE theme IS NOT DISTINCT FROM $1
+     ORDER BY route, COALESCE(scope_urn, '')`,
+    [opts.themeId]
+  );
+
+  const documents = documentRows.rows.map((r) => ({
+    route: r.route,
+    scope_urn: r.scope_urn,
+    data: r.data
+  }));
+
   return {
     theme_name: opts.preserveThemeName ?? opts.themeId,
     version: opts.version,
+    // Explicit, so a re-exported theme declares its schema rather than
+    // relying on inference from the presence of `documents`.
+    schema: 2 as const,
     widgets,
     placements,
+    documents,
     ...(metafieldDefinitions.length > 0 ? { metafieldDefinitions } : {})
   };
 }

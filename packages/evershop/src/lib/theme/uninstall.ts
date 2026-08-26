@@ -101,6 +101,9 @@ export async function applyUninstall(
     await conn.query(`DELETE FROM rollout_plan WHERE theme = $1`, [themeId]);
     await conn.query(`DELETE FROM changeset WHERE theme = $1`, [themeId]);
     await conn.query(`DELETE FROM widget_instance WHERE theme = $1`, [themeId]);
+    // Documents belong to the theme the same way widget rows do; leaving them
+    // behind would keep an uninstalled theme's pages rendering.
+    await conn.query(`DELETE FROM puck_document WHERE theme = $1`, [themeId]);
     await conn.query(`DELETE FROM theme_install_state WHERE theme = $1`, [
       themeId
     ]);

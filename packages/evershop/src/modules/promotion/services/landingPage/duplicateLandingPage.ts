@@ -129,6 +129,30 @@ async function duplicateLandingPageData(
       .execute(connection);
   }
 
+  /**
+   * 3. Clone the page-builder body's OTHER representation.
+   *
+   * An entity-scoped `puck_document` is what the Puck render path reads, and
+   * it is keyed by `(route, scope_urn)` — so a duplicate that only cloned
+   * widget rows would produce a copy whose page was empty under Puck while
+   * looking correct under the widget pipeline, right up until cutover.
+   *
+   * The document's `data` is copied verbatim, component ids included. Those
+   * ids are per-document, and two documents are never rendered on the same
+   * page, so there is nothing for them to collide with — unlike the widget
+   * rows above, whose uuids are globally unique and therefore had to be
+   * remapped.
+   */
+  await connection.query(
+    `INSERT INTO puck_document (route, scope_urn, theme, data)
+     SELECT route, $1, theme, data
+       FROM puck_document
+      WHERE scope_urn = $2
+     ON CONFLICT (route, COALESCE(scope_urn,''), COALESCE(theme,''))
+     DO UPDATE SET data = EXCLUDED.data`,
+    [newUrn, oldUrn]
+  );
+
   return copy;
 }
 

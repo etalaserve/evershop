@@ -51,10 +51,10 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 function toWidgetMap(m: Manifest): Map<string, WidgetRecord> {
-  return new Map(m.widgets.map((w) => [w.uuid, w]));
+  return new Map((m.widgets ?? []).map((w) => [w.uuid, w]));
 }
 function toPlacementMap(m: Manifest): Map<string, PlacementRecord> {
-  return new Map(m.placements.map((p) => [p.uuid, p]));
+  return new Map((m.placements ?? []).map((p) => [p.uuid, p]));
 }
 
 /**

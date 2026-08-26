@@ -85,8 +85,8 @@ async function main(): Promise<void> {
   await fs.writeFile(target, JSON.stringify(manifest, null, 2), 'utf8');
   console.log(
     kleur.green(
-      `Wrote ${target} (${manifest.widgets.length} widgets, ` +
-        `${manifest.placements.length} placements).`
+      `Wrote ${target} (${(manifest.widgets ?? []).length} widgets, ` +
+        `${(manifest.placements ?? []).length} placements).`
     )
   );
 }
