@@ -136,18 +136,22 @@ test.describe('puck editor: drag and drop', () => {
     // A save that only lived in Puck's memory would vanish here.
     await page.goto(EDITOR);
     await waitForCanvas(page);
-    // Attached, not visible. Every palette entry's `defaultSettings` are empty
-    // strings, so a freshly dropped widget renders no content and occupies no
-    // space — `coupon_block` with no heading and no code draws nothing. That is
-    // inherited from the legacy editor, where WidgetChrome gave an empty widget
-    // a selectable outline. Under Puck it is an invisible box the merchant
-    // cannot click, which needs fixing before cutover (presentable defaults, or
-    // a min-height for empty components) — but it is not what this test is
-    // about. Asserting attachment keeps this test measuring the round trip
-    // rather than silently doubling as a defaults test.
+    // VISIBLE, not merely attached. Every palette entry's `defaultSettings` are
+    // empty strings, so a freshly dropped widget renders no content of its own
+    // — `coupon_block` with no heading and no code draws nothing. The editor
+    // wraps each component in an empty-state shell (edit mode only) precisely
+    // so the merchant can see and click what they just dropped. Asserting
+    // visibility here is what keeps that shell from silently regressing back
+    // into a zero-height box.
     await expect(
       page.frameLocator('#preview-frame').locator('[data-puck-component]').first()
-    ).toBeAttached({ timeout: 60_000 });
+    ).toBeVisible({ timeout: 60_000 });
+
+    // The shell must name the widget, so an empty drop is identifiable rather
+    // than an anonymous dashed rectangle.
+    await expect(
+      page.frameLocator('#preview-frame').locator('[data-evershop-widget-shell]').first()
+    ).toHaveAttribute('data-evershop-widget-shell', 'Coupon block');
 
     // Still a draft — nothing reaches the live storefront until Publish.
     const { rows: published } = await getDb().query(

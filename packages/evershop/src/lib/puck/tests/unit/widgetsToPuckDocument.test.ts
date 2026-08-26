@@ -260,3 +260,45 @@ describe('depth constant', () => {
     expect(MAX_RENDERABLE_DEPTH).toBe(3);
   });
 });
+
+describe('ordering with tied sort_order', () => {
+  /**
+   * `sort_order` is not unique. Postgres returns tied rows in an arbitrary
+   * order that can change between requests, so the converter must impose its
+   * own deterministic tie-break — otherwise it freezes one arbitrary order
+   * into the document and the converted page can render differently from the
+   * widget pipeline. This was found in the wild: the homepage byte-diff failed
+   * intermittently because a seeded widget shared sort_order 100 with an
+   * existing one.
+   */
+  it('breaks sort_order ties by uuid, regardless of input order', () => {
+    const instances = [
+      { uuid: 'i-alpha', type: 'text_block', settings: {} },
+      { uuid: 'i-beta', type: 'text_block', settings: {} }
+    ];
+    // Same sort_order; the two placements differ only by uuid.
+    const a = {
+      uuid: 'aaaaaaaa-0000-0000-0000-000000000000',
+      widget_instance_uuid: 'i-alpha',
+      area: 'content',
+      sort_order: 100
+    };
+    const b = {
+      uuid: 'bbbbbbbb-0000-0000-0000-000000000000',
+      widget_instance_uuid: 'i-beta',
+      area: 'content',
+      sort_order: 100
+    };
+
+    const forward = toPuckDocument(instances, [a, b]);
+    const reversed = toPuckDocument(instances, [b, a]);
+
+    const ids = (r: ReturnType<typeof toPuckDocument>) =>
+      r.data.content.map((c) => (c.props as { id: string }).id);
+
+    // Both input orders must produce the same document, or the converter is
+    // still sensitive to whatever order the database happened to return.
+    expect(ids(forward)).toEqual(ids(reversed));
+    expect(ids(forward)).toEqual(['i-alpha', 'i-beta']);
+  });
+});

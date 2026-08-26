@@ -52,6 +52,28 @@ export interface WidgetPlacementLike {
   sort_order: number;
 }
 
+/**
+ * Order placements the way the storefront renders them.
+ *
+ * `sort_order` is not unique, so it cannot order placements on its own: tied
+ * rows come back from Postgres in whatever order it likes, which differs
+ * between requests. Without a tie-break the converter freezes one of those
+ * arbitrary orders into the document, and the converted page can then render
+ * in a different order than the widget pipeline does — the exact silent
+ * reordering the byte-diff harness exists to catch, and which it did catch.
+ *
+ * `uuid` is the tie-break, matching the `ORDER BY wp.sort_order, wp.uuid` the
+ * widget query uses. The two must stay in step; changing one without the
+ * other reintroduces the disagreement.
+ */
+function byRenderOrder(
+  a: WidgetPlacementLike,
+  b: WidgetPlacementLike
+): number {
+  if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+  return a.uuid < b.uuid ? -1 : a.uuid > b.uuid ? 1 : 0;
+}
+
 export interface ConvertResult {
   data: PuckData;
   /**
@@ -147,7 +169,7 @@ export function toPuckDocument(
         // area's column index, so the mapping stays legible both ways.
         props[`col${index}`] = kids
           .slice()
-          .sort((a, b) => a.sort_order - b.sort_order)
+          .sort(byRenderOrder)
           .map((k) => build(k, depth + 1))
           .filter((c): c is ComponentData => c !== null);
       }
@@ -158,7 +180,7 @@ export function toPuckDocument(
 
   const content = topLevel
     .slice()
-    .sort((a, b) => a.sort_order - b.sort_order)
+    .sort(byRenderOrder)
     .map((p) => build(p, 0))
     .filter((c): c is ComponentData => c !== null);
 

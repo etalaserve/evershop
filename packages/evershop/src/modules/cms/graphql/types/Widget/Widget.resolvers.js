@@ -282,6 +282,12 @@ export default {
           (m, p) => Math.min(m, p.sort_order ?? 0),
           Number.POSITIVE_INFINITY
         );
+        // The uuid of the placement that produced minSort, used only to break
+        // ties below. sort_order is not unique, so two widgets can share one.
+        const minSortUuid = visiblePlacements
+          .filter((p) => (p.sort_order ?? 0) === minSort)
+          .map((p) => p.uuid)
+          .sort()[0];
         const camel = camelCase(widget);
         camel._overlayPlacements = placements
           .slice()
@@ -294,10 +300,26 @@ export default {
           entityUrn,
           route
         );
-        result.push({ widget: camel, minSort });
+        result.push({ widget: camel, minSort, minSortUuid });
       }
 
-      result.sort((a, b) => a.minSort - b.minSort);
+      // Tie-break by placement uuid. sort_order is not unique, and a bare
+      // numeric sort leaves tied widgets in whatever order the source query
+      // happened to produce, which varies between requests — so a page with
+      // two widgets at the same sort_order renders in an unstable order.
+      // It also let the Puck converter freeze one of those arbitrary orders
+      // into a document that then disagreed with the live page. This mirrors
+      // byRenderOrder() in lib/puck/convert/widgetsToPuckDocument.ts; the two
+      // must stay in step.
+      result.sort(
+        (a, b) =>
+          a.minSort - b.minSort ||
+          (a.minSortUuid < b.minSortUuid
+            ? -1
+            : a.minSortUuid > b.minSortUuid
+              ? 1
+              : 0)
+      );
       return result.map((r) => r.widget);
     },
     widgetTypes: () => {
@@ -1149,7 +1171,15 @@ export default {
          INNER JOIN widget_instance wi
                  ON wi.widget_instance_id = wp.widget_instance_id
          WHERE LEFT(wp.area, $1) = $2
-         ORDER BY wp.sort_order ASC`,
+         -- uuid breaks ties. sort_order is not unique, and without a
+         -- secondary key Postgres may return tied placements in either order
+         -- from one request to the next, so a page with two widgets at the
+         -- same sort_order renders in an unstable order. It also made the
+         -- Puck converter freeze whichever order it happened to read, so a
+         -- converted document could disagree with the live page. Mirrors the
+         -- comparator in lib/puck/convert/widgetsToPuckDocument.ts, and the
+         -- existing precedent in RecommendationAdmin.admin.resolvers.ts.
+         ORDER BY wp.sort_order ASC, wp.uuid ASC`,
         [prefix.length, prefix]
       );
       if (result.rows.length === 0) return [];

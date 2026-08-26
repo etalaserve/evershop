@@ -308,7 +308,39 @@ export default function PuckPageBuilder() {
         of which never does anything. Targeted by `aria-label` rather than
         class, since Puck's class names carry a build hash.
       */}
-      <style>{`.Puck [aria-label="undo"], .Puck [aria-label="redo"] { display: none; }`}</style>
+      <style>{`
+        .Puck [aria-label="undo"], .Puck [aria-label="redo"] { display: none; }
+
+        /*
+          Make an empty widget selectable in the canvas.
+
+          Every palette entry's defaultSettings are empty strings, so a freshly
+          dropped widget renders nothing and collapses to zero height — the drop
+          looks like it failed and there is nothing to click to configure it.
+          buildPuckConfig wraps each component in [data-evershop-widget-shell]
+          under mode === 'edit' only, so these rules never reach the storefront.
+
+          :empty matches exactly when the component rendered nothing, so a
+          configured widget is untouched. Comments do not defeat :empty.
+
+          Puck mirrors the host document's styles into the canvas iframe, which
+          is how these rules apply inside it.
+        */
+        [data-evershop-widget-shell]:empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 72px;
+          padding: 1rem;
+          border: 1px dashed color-mix(in oklch, currentColor 35%, transparent);
+          border-radius: 0.5rem;
+          font: 500 0.8125rem/1.2 ui-sans-serif, system-ui, sans-serif;
+          opacity: 0.65;
+        }
+        [data-evershop-widget-shell]:empty::after {
+          content: attr(data-evershop-widget-shell) " — add content in the sidebar";
+        }
+      `}</style>
 
       {error ? (
         <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">

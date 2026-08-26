@@ -129,9 +129,15 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
       render: (props: Record<string, unknown>) => {
         const { id, puck, ...rest } = props as {
           id: string;
-          puck?: { metadata?: { extras?: Record<string, unknown> } };
+          puck?: {
+            metadata?: {
+              extras?: Record<string, unknown>;
+              mode?: 'render' | 'edit';
+            };
+          };
         } & Record<string, unknown>;
         const extras = puck?.metadata?.extras ?? {};
+        const isEditing = puck?.metadata?.mode === 'edit';
 
         // Split slot components out of the settings. Puck replaces a declared
         // slot field's value with a renderable component, so leaving `col0` in
@@ -172,10 +178,41 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
         // boundary, which is what makes the per-widget isolation real. It also
         // gives each widget its own component identity, so its hooks and state
         // belong to it rather than to this bridge.
-        return React.createElement(
+        const rendered = React.createElement(
           WidgetBoundary,
           { type, id },
           React.createElement(Component as React.ComponentType<never>, widgetProps as never)
+        );
+
+        if (!isEditing) return rendered;
+
+        /**
+         * In the editor only, wrap the component so an empty one is still
+         * selectable.
+         *
+         * Every palette entry's `defaultSettings` are empty strings, so a
+         * freshly dropped widget renders nothing and collapses to zero height
+         * — the merchant sees the drop apparently do nothing, and there is no
+         * box to click to open the settings. The legacy editor hid this
+         * because `WidgetChrome` wrapped every widget in its own selectable
+         * outline; Puck has no equivalent for a component that renders null.
+         *
+         * The wrapper is added ONLY under `mode === 'edit'`, so the storefront
+         * renders exactly what it did before — the byte-diff harness compares
+         * render-mode output and would fail if this leaked. The alternative,
+         * giving the palette presentable placeholder defaults, was rejected
+         * because those strings get PERSISTED on drop and would ship to a live
+         * store if the merchant did not overwrite them.
+         *
+         * `:empty` does the detection in CSS (see the editor route's style
+         * block): the wrapper has no child nodes precisely when the component
+         * rendered nothing. Comments do not defeat `:empty`, so React's SSR
+         * markers are not a problem.
+         */
+        return React.createElement(
+          'div',
+          { 'data-evershop-widget-shell': meta.label },
+          rendered
         );
       }
     };
