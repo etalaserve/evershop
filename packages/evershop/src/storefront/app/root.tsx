@@ -5,7 +5,8 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
-  useLoaderData
+  useLoaderData,
+  useLocation
 } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 
@@ -73,17 +74,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { storeName, themeTokens, categories } = useLoaderData<typeof loader>();
+  const { pathname } = useLocation();
+
+  /**
+   * Admin routes get no storefront chrome.
+   *
+   * This root layout wraps every route, so without this check `/admin/*`
+   * renders the shop's header, category nav and copyright footer around the
+   * admin UI — which has its own sidebar shell in `routes/admin.tsx`. It also
+   * caps the admin at `min-h-screen` minus that chrome, so a full-height
+   * surface like the page-builder editor cannot use the viewport it needs.
+   *
+   * Matched on the pathname rather than by moving admin routes under a
+   * separate root, because React Router allows only one root layout and the
+   * `admin_.` route prefix (used to escape the admin sidebar for full-screen
+   * pages like the editor) escapes any admin-only layout too.
+   */
+  const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
+
   return (
     <PreviewProvider>
       <PageBuilderBridge />
       <ThemeStyle tokens={themeTokens} />
-      <div className="flex min-h-screen flex-col">
-        <Header storeName={storeName} categories={categories} />
-        <main className="flex-1">
-          <Outlet />
-        </main>
-        <Footer storeName={storeName} />
-      </div>
+      {isAdmin ? (
+        <Outlet />
+      ) : (
+        <div className="flex min-h-screen flex-col">
+          <Header storeName={storeName} categories={categories} />
+          <main className="flex-1">
+            <Outlet />
+          </main>
+          <Footer storeName={storeName} />
+        </div>
+      )}
     </PreviewProvider>
   );
 }
