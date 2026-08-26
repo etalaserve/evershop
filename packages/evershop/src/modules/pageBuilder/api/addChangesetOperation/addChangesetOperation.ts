@@ -201,6 +201,100 @@ export default async (
       .and('change_order', '>', routeCursorOrder)
       .execute(conn);
 
+    /**
+     * Coalesce a rapid follow-up edit into the tip instead of appending.
+     *
+     * The Puck editor saves a whole-document snapshot on a debounce, so a
+     * merchant dragging a slider or typing a heading produces a save every
+     * few hundred milliseconds. Appending each one would grow the changeset
+     * without bound and — because undo moves the cursor one op at a time —
+     * make Undo step through dozens of near-identical states to reverse one
+     * logical edit.
+     *
+     * When the incoming write targets the same document as the tip and the
+     * tip is younger than the window, its `new_payload` is rewritten in
+     * place. `change_order` and `route_cursors` do not move, so the unique
+     * index, the redo stack and every apply path are untouched.
+     *
+     * `old_payload` deliberately stays the TIP's: the pair must describe
+     * (state before the first edit in this window, state now). Taking the
+     * incoming op's `old_payload` would make undo restore an intermediate
+     * state that the merchant never saw as a resting point, and would break
+     * INSERT-ness — an INSERT coalesced with a later UPDATE has to stay an
+     * INSERT, which it does precisely because a null `old_payload` is kept.
+     *
+     * Four things are never coalesced:
+     *  - A DELETE, incoming or tip. Deletions are discrete structural
+     *    actions and must remain individually undoable.
+     *  - A different document. Only the same `entity_urn` merges.
+     *  - Anything at or below a rollout floor: the floor is what live
+     *    traffic is already being served, so rewriting that op would change
+     *    what shoppers see without a publish.
+     *  - A tip older than the window, which bounds a long editing session to
+     *    roughly one op per window rather than one per keystroke.
+     */
+    const COALESCE_WINDOW_MS = 15_000;
+
+    if (newPayload !== null && routeCursorOrder > 0) {
+      // The floor is the rollout's snapshot cursor for this route, matching
+      // moveCurrentChange's own rule. Absent a rollout there is no floor.
+      const rolloutPlan = await select()
+        .from('rollout_plan')
+        .where('changeset_id', '=', changesetId)
+        .load(conn);
+      const floor = rolloutPlan
+        ? Number(
+            (((rolloutPlan as any).route_cursors as Record<string, number> | null) ??
+              {})[route] ?? 0
+          )
+        : 0;
+
+      if (routeCursorOrder > floor) {
+        const tipRes = await conn.query(
+          `SELECT * FROM changeset_operation
+            WHERE changeset_id = $1 AND route = $2 AND change_order = $3
+            LIMIT 1`,
+          [changesetId, route, routeCursorOrder]
+        );
+        const tip = tipRes.rows[0] as
+          | {
+              changeset_operation_id: number;
+              entity_urn: string;
+              new_payload: unknown;
+              created_at: string | Date;
+            }
+          | undefined;
+
+        const withinWindow =
+          !!tip &&
+          Date.now() - new Date(tip.created_at).getTime() < COALESCE_WINDOW_MS;
+
+        if (
+          tip &&
+          withinWindow &&
+          tip.entity_urn === entityUrn &&
+          tip.new_payload !== null
+        ) {
+          const updated = await conn.query(
+            `UPDATE changeset_operation
+                SET new_payload = $1::jsonb
+              WHERE changeset_operation_id = $2
+              RETURNING *`,
+            [JSON.stringify(newPayload), tip.changeset_operation_id]
+          );
+          // `updated_at` is the changeset's natural version token — overlay
+          // memoization keys on it — so it still has to move even though no
+          // cursor did.
+          await conn.query(
+            `UPDATE changeset SET updated_at = NOW() WHERE changeset_id = $1`,
+            [changesetId]
+          );
+          await commit(conn);
+          return response.status(CREATED).json({ data: updated.rows[0] });
+        }
+      }
+    }
+
     // New change_order = max(existing) + 1 across the whole changeset, so the
     // storage order keeps a single timeline. Apply paths still split by
     // route_cursors when filtering "what's currently applied".
