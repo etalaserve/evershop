@@ -1,0 +1,86 @@
+<body><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"/><style>:root {
+  --primary: #171717;
+  --secondary: #f5f5f5;
+  --accent: #f5f5f5;
+  --destructive: #dc2626;
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #f5f5f5;
+  --radius: 0.5rem;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+}</style><div class="flex min-h-screen flex-col"><header class="border-b border-border bg-background"><div class="mx-auto flex max-w-6xl items-center gap-6 px-4 py-4"><a class="shrink-0 text-lg font-semibold" href="/" data-discover="true">My Test Store</a><nav class="hidden items-center gap-4 md:flex"><a class="text-sm text-muted-foreground hover:text-foreground" href="/category/accessories" data-discover="true">Accessories</a><a class="text-sm text-muted-foreground hover:text-foreground" href="/category/men" data-discover="true">Men</a><a class="text-sm text-muted-foreground hover:text-foreground" href="/category/women" data-discover="true">Women</a><a class="text-sm text-muted-foreground hover:text-foreground" href="/category/kids" data-discover="true">Kids</a><a class="text-sm text-muted-foreground hover:text-foreground" href="/blog" data-discover="true">Blog</a></nav><form class="ml-auto flex max-w-xs flex-1 items-center gap-2" action="/search" method="get"><div class="relative flex-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg><input class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-8" placeholder="Search products" name="q"/></div></form><a aria-label="Account" class="shrink-0 text-foreground" href="/account" data-discover="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user h-5 w-5" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></a><a aria-label="Cart" class="shrink-0 text-foreground" href="/cart" data-discover="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-cart h-5 w-5" aria-hidden="true"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg></a></div></header><main class="flex-1"><div class="mx-auto max-w-6xl space-y-6 px-4 py-8"><div class="space-y-1"><h1 class="text-2xl font-semibold">Search</h1></div><p class="text-sm text-muted-foreground">No products found.</p><div></div></div></main><footer class="border-t border-border bg-background"><div class="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">© <!-- -->2026<!-- --><!-- -->My Test Store<!-- -->. All rights reserved.</div></footer></div><script>((storageKey2, restoreKey) => {
+    if (!window.history.state || !window.history.state.key) {
+      let key = Math.random().toString(32).slice(2);
+      window.history.replaceState({ key }, "");
+    }
+    try {
+      let positions = JSON.parse(sessionStorage.getItem(storageKey2) || "{}");
+      let storedY = positions[restoreKey || window.history.state.key];
+      if (typeof storedY === "number") {
+        window.scrollTo(0, storedY);
+      }
+    } catch (error) {
+      console.error(error);
+      sessionStorage.removeItem(storageKey2);
+    }
+  })("react-router-scroll-positions", null)</script><script type="module" async="">import "/storefront-assets/@id/__x00__virtual:react-router/inject-hmr-runtime";;
+import * as route0 from "/storefront-assets/app/root.tsx";
+import * as route1 from "/storefront-assets/app/routes/search.tsx";
+  window.__reactRouterManifest = {
+  "version": "0.7238581558583597",
+  "url": "/storefront-assets/@id/__x00__virtual:react-router/browser-manifest",
+  "hmr": {
+    "runtime": "/storefront-assets/@id/__x00__virtual:react-router/inject-hmr-runtime"
+  },
+  "entry": {
+    "module": "/storefront-assets/app/entry.client.tsx",
+    "imports": []
+  },
+  "routes": {
+    "root": {
+      "id": "root",
+      "path": "",
+      "module": "/storefront-assets/app/root.tsx",
+      "hasAction": false,
+      "hasLoader": true,
+      "hasClientAction": false,
+      "hasClientLoader": false,
+      "hasClientMiddleware": false,
+      "hasDefaultExport": true,
+      "hasErrorBoundary": true,
+      "imports": []
+    },
+    "routes/search": {
+      "id": "routes/search",
+      "parentId": "root",
+      "path": "search",
+      "module": "/storefront-assets/app/routes/search.tsx",
+      "hasAction": false,
+      "hasLoader": true,
+      "hasClientAction": false,
+      "hasClientLoader": false,
+      "hasClientMiddleware": false,
+      "hasDefaultExport": true,
+      "hasErrorBoundary": false,
+      "imports": []
+    },
+    "routes/_index": {
+      "id": "routes/_index",
+      "parentId": "root",
+      "index": true,
+      "module": "/storefront-assets/app/routes/_index.tsx",
+      "hasAction": false,
+      "hasLoader": true,
+      "hasClientAction": false,
+      "hasClientLoader": false,
+      "hasClientMiddleware": false,
+      "hasDefaultExport": true,
+      "hasErrorBoundary": false,
+      "imports": []
+    }
+  }
+};
+  window.__reactRouterRouteModules = {"root":route0,"routes/search":route1};
+
+import("/storefront-assets/app/entry.client.tsx");</script><template></template><script>requestAnimationFrame(function(){$RT=performance.now()});</script><div hidden><template></template></div><script>$RB=[];$RV=function(a){$RT=performance.now();for(var b=0;b<a.length;b+=2){var c=a[b],e=a[b+1];null!==e.parentNode&&e.parentNode.removeChild(e);var f=c.parentNode;if(f){var g=c.previousSibling,h=0;do{if(c&&8===c.nodeType){var d=c.data;if("/$"===d||"/&"===d)if(0===h)break;else h--;else"$"!==d&&"$?"!==d&&"$~"!==d&&"$!"!==d&&"&"!==d||h++}d=c.nextSibling;f.removeChild(c);c=d}while(c);for(;e.firstChild;)f.insertBefore(e.firstChild,c);g.data="$";g._reactRetry&&requestAnimationFrame(g._reactRetry)}}a.length=0};
+$RC=function(a,b){if(b=document.getElementById(b))(a=document.getElementById(a))?(a.previousSibling.data="$~",$RB.push(a,b),2===$RB.length&&("number"!==typeof $RT?requestAnimationFrame($RV.bind(null,$RB)):(a=performance.now(),setTimeout($RV.bind(null,$RB),2300>a&&2E3<a?2300-a:$RT+300-a)))):b.parentNode.removeChild(b)};$RC("B:0","S:0")</script><div hidden></div></body>
