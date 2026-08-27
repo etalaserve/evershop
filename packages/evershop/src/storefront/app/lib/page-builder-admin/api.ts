@@ -19,8 +19,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export interface AddOperationInput {
   route: string;
   entityUrn: string;
-  oldPayload: Record<string, unknown> | null;
-  newPayload: Record<string, unknown> | null;
+  /**
+   * Any JSON object. Deliberately wider than `Record<string, unknown>`, which
+   * rejects a precisely-typed payload like `PuckDocumentPayload` — the shape
+   * varies by URN type and the endpoint stores it as jsonb regardless.
+   */
+  oldPayload: object | null;
+  newPayload: object | null;
 }
 
 /**

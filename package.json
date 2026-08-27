@@ -11,6 +11,8 @@
     "dev": "node ./packages/evershop/dist/bin/dev/index.js",
     "start": "node ./packages/evershop/dist/bin/start/index.js",
     "build": "node ./packages/evershop/dist/bin/build/index.js",
+    "typecheck": "tsc --noEmit -p packages/evershop/tsconfig.json",
+    "typecheck:storefront": "tsc --noEmit -p packages/evershop/src/storefront/tsconfig.json",
     "setup": "evershop install",
     "user:create": "evershop user:create",
     "seed": "evershop seed",

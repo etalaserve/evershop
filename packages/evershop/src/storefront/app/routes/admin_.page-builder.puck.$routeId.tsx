@@ -89,18 +89,16 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
    */
   const isGlobalRoute = routeId === GLOBAL_ROUTE;
 
-  const route = isGlobalRoute
-    ? { id: GLOBAL_ROUTE, name: 'Global (all pages)' }
-    : (await gqlAdmin<RouteResponse>(ROUTE_QUERY, { id: routeId }, cookie)).route;
-
-  if (
-    !route ||
-    (!isGlobalRoute &&
-      ((route as RouteResponse['route']).isApi ||
-        (route as RouteResponse['route']).isAdmin ||
-        !(route as RouteResponse['route']).editableInPageBuilder))
-  ) {
-    throw data('This route is not open for page-builder editing', { status: 404 });
+  let route: { id: string; name: string };
+  if (isGlobalRoute) {
+    route = { id: GLOBAL_ROUTE, name: 'Global (all pages)' };
+  } else {
+    const real = (await gqlAdmin<RouteResponse>(ROUTE_QUERY, { id: routeId }, cookie))
+      .route;
+    if (!real || real.isApi || real.isAdmin || !real.editableInPageBuilder) {
+      throw data('This route is not open for page-builder editing', { status: 404 });
+    }
+    route = { id: real.id, name: real.name };
   }
 
   const url = new URL(request.url);
@@ -617,6 +615,7 @@ export default function PuckPageBuilder() {
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}
+        isBusy={isSaving}
         operationCount={changeset.operationCount}
         onConfirm={async () => {
           await flush();
@@ -628,6 +627,7 @@ export default function PuckPageBuilder() {
       <DiscardConfirmDialog
         open={discardOpen}
         onOpenChange={setDiscardOpen}
+        isBusy={isSaving}
         operationCount={changeset.operationCount}
         onConfirm={async () => {
           pendingRef.current = null;

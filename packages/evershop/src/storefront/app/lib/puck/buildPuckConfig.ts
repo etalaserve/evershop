@@ -246,9 +246,19 @@ export function buildPuckConfig(opts: BuildConfigOptions = {}): PuckConfig {
         // gives each widget its own component identity, so its hooks and state
         // belong to it rather than to this bridge.
         const rendered = React.createElement(
-          WidgetBoundary,
-          { type, id },
-          React.createElement(Component as React.ComponentType<never>, widgetProps as never)
+          WidgetBoundary as React.ComponentType<{
+            type: string;
+            id: string;
+            children: React.ReactNode;
+          }>,
+          {
+            type,
+            id,
+            children: React.createElement(
+              Component as React.ComponentType<never>,
+              widgetProps as never
+            )
+          }
         );
 
         if (!isEditing) return rendered;

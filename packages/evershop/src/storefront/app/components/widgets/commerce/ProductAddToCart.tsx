@@ -40,7 +40,7 @@ export function ProductAddToCart({ page }: WidgetComponentProps) {
     setStatus('adding');
     setError(null);
     try {
-      await addToCart({ sku: product!.sku, qty });
+      await addToCart(product!.sku, qty);
       setStatus('added');
     } catch (e) {
       setStatus('idle');

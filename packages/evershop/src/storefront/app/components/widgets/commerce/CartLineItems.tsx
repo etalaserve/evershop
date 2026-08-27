@@ -12,7 +12,9 @@ import { CommercePlaceholder } from './CommercePlaceholder.js';
  */
 export function CartLineItems({ page }: WidgetComponentProps) {
   const cart = page?.cart?.cart;
-  if (!cart) return <CommercePlaceholder label="Cart items" />;
+  // `items` is nullable on the cart type, and mapping over null throws — an
+  // empty cart must render an empty list, not take the page down.
+  if (!cart?.items) return <CommercePlaceholder label="Cart items" />;
 
   return (
     <div className="divide-y divide-border rounded-lg border border-border">

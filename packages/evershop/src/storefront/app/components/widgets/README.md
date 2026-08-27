@@ -175,8 +175,8 @@ a custom block; over-requiring turns a guarantee into an obstruction.
 ## Checking your work
 
 ```bash
-# type check (expect only the 3 known createStorefrontMiddleware errors)
-cd packages/evershop/src/storefront && npx tsc --noEmit -p .
+# type check — see the Type-checking section below for why the path matters
+npm run typecheck:storefront
 
 # both pipelines still render identically
 cd tests/e2e && npx playwright test pageBuilder/specs/00-migration --project=functional
@@ -185,3 +185,20 @@ cd tests/e2e && npx playwright test pageBuilder/specs/00-migration --project=fun
 The editor is at `/admin/page-builder/puck/<routeId>`. First load takes ~50s on
 a cold dev server — that is Vite transforming modules on demand, not your
 widget.
+
+---
+
+## Type-checking
+
+Run it from the repo root with the **explicit config path**:
+
+```bash
+npm run typecheck:storefront
+```
+
+Do **not** run `npx tsc -p .` from inside `src/storefront`. `npx` executes from
+the nearest `package.json` — `packages/evershop/` — so `-p .` resolves that
+package's tsconfig instead, and that config has `"exclude": ["src/storefront"]`.
+The result is a check that reports success while examining none of this code.
+That silently shipped a broken add-to-cart button; the npm script above exists
+so nobody repeats it.

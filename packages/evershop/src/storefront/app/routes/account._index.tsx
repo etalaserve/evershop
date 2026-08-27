@@ -4,11 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card.j
 import { WidgetArea } from '~/components/widgets/WidgetArea.js';
 import { PuckArea } from '~/components/widgets/PuckArea.js';
 import { loadPuckForRequest } from '~/lib/puck/engineSwitch.js';
-import {
-  CURRENT_CUSTOMER_QUERY,
-  type CurrentCustomerResponse
-} from '~/lib/graphql/queries/customer.js';
 import { gql } from '~/lib/graphql/client.js';
+import { CURRENT_CUSTOMER_QUERY } from '~/lib/graphql/queries/customer.js';
 import type { CurrentCustomerResponse } from '~/lib/graphql/queries/customer.js';
 import { WIDGETS_FOR_ROUTE_QUERY, type WidgetsForRouteResponse } from '~/lib/graphql/queries/widgets.js';
 import { resolveWidgetExtras } from '~/lib/widgets/resolveWidgetExtras.js';
@@ -38,7 +35,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
    */
   const wantsPuck = new URL(request.url).searchParams.get('__engine') === 'puck';
   const customer = wantsPuck
-    ? (await gql<CurrentCustomerResponse>(CURRENT_CUSTOMER_QUERY, {}, cookie))
+    ? (await gql<CurrentCustomerResponse>(
+        CURRENT_CUSTOMER_QUERY,
+        {},
+        cookie ? { Cookie: cookie } : undefined
+      ))
         .currentCustomer
     : null;
   const puck = await loadPuckForRequest(request, ROUTE_ID, {
