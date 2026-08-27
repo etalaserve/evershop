@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '../../../shared/test.js';
 import { getActiveChangesetId } from '../../../shared/changesetDb.js';
 import { discardAdminChangesets, getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function adminUserId(): number {
@@ -105,9 +110,18 @@ test.describe('puck editor: drag and drop', () => {
   // interactive, and this spec loads it twice.
   test.setTimeout(300_000);
 
+  // Snapshot and restore rather than delete. This route may hold a REAL
+  // document — a backfilled store has one — and a spec that deletes it
+  // destroys the developer's content as a side effect of running the tests.
+  let documentsBefore: PuckDocumentSnapshot[] = [];
+
+  test.beforeEach(async () => {
+    documentsBefore = await snapshotPuckDocuments();
+  });
+
   test.afterEach(async () => {
     await discardAdminChangesets(adminUserId());
-    await getDb().query(`DELETE FROM puck_document WHERE route = $1`, [ROUTE_ID]);
+    await restorePuckDocuments(documentsBefore);
   });
 
   test('dropping a component writes a changeset op and survives a reload', async ({
@@ -148,16 +162,32 @@ test.describe('puck editor: drag and drop', () => {
     ).toBeVisible({ timeout: 60_000 });
 
     // The shell must name the widget, so an empty drop is identifiable rather
-    // than an anonymous dashed rectangle.
+    // than an anonymous dashed rectangle. Targeted by NAME rather than by
+    // position: this route can already hold content (a backfilled store does),
+    // so `.first()` finds whatever sits at the top of the page instead of the
+    // component the test just dropped.
     await expect(
-      page.frameLocator('#preview-frame').locator('[data-evershop-widget-shell]').first()
-    ).toHaveAttribute('data-evershop-widget-shell', 'Coupon block');
+      page
+        .frameLocator('#preview-frame')
+        .locator('[data-evershop-widget-shell="Coupon block"]')
+        .first()
+    ).toBeVisible({ timeout: 60_000 });
 
     // Still a draft — nothing reaches the live storefront until Publish.
-    const { rows: published } = await getDb().query(
-      `SELECT 1 FROM puck_document WHERE route = $1`,
+    //
+    // Asserted on CONTENT, not on the absence of a row: this route may already
+    // have a published document (a backfilled store does), and "no row" would
+    // then fail for a reason that has nothing to do with leakage — while also
+    // passing vacuously on a store where the route was simply never published.
+    const { rows: published } = await getDb().query<{ data: unknown }>(
+      `SELECT data FROM puck_document WHERE route = $1`,
       [ROUTE_ID]
     );
-    expect(published, 'an unpublished edit reached published state').toHaveLength(0);
+    for (const row of published) {
+      expect(
+        JSON.stringify(row.data),
+        'an unpublished edit reached published state'
+      ).not.toContain('coupon_block');
+    }
   });
 });

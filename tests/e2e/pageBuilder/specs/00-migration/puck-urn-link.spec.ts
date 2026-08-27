@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '../../../shared/test.js';
 import { getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 import { backfillPuckDocuments } from '../../../../../packages/evershop/dist/lib/puck/convert/backfillPuckDocuments.js';
 
 /**
@@ -57,9 +62,7 @@ test.describe('puck render path: URN links', () => {
     const { entity_uuid: categoryUuid, request_path: expectedPath } = cats[0];
     const urn = `urn:evershop:catalog:category:${categoryUuid}`;
 
-    const documentsBefore = (
-      await db.query(`SELECT route, scope_urn, theme, data FROM puck_document`)
-    ).rows;
+    const documentsBefore = await snapshotPuckDocuments();
 
     try {
       await db.query(
@@ -117,14 +120,7 @@ test.describe('puck render path: URN links', () => {
       await db.query(`DELETE FROM widget_instance WHERE name LIKE $1`, [
         `${marker}-%`
       ]);
-      await db.query(`DELETE FROM puck_document`);
-      for (const doc of documentsBefore) {
-        await db.query(
-          `INSERT INTO puck_document (route, scope_urn, theme, data)
-           VALUES ($1, $2, $3, $4)`,
-          [doc.route, doc.scope_urn, doc.theme, doc.data]
-        );
-      }
+      await restorePuckDocuments(documentsBefore);
     }
   });
 });

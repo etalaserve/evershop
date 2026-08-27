@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext } from '../../../shared/test.js';
 import { getActiveChangesetId } from '../../../shared/changesetDb.js';
 import { discardAdminChangesets, getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function adminUserId(): number {
@@ -63,10 +68,19 @@ async function postDocument(
 
 test.describe('productView commerce furniture', () => {
   test.setTimeout(180_000);
+  // Snapshot the whole table rather than deleting rows: this holds REAL
+  // content on a store that has run the backfill, and a spec that deletes it
+  // destroys the developer's pages as a side effect of running tests.
+  let documentsBefore: PuckDocumentSnapshot[] = [];
+
+  test.beforeEach(async () => {
+    documentsBefore = await snapshotPuckDocuments();
+  });
+
 
   test.afterEach(async () => {
     await discardAdminChangesets(adminUserId());
-    await getDb().query(`DELETE FROM puck_document WHERE route = $1`, [ROUTE_ID]);
+    await restorePuckDocuments(documentsBefore);
   });
 
   test('the buy button cannot be removed, at write or at publish', async ({ request }) => {

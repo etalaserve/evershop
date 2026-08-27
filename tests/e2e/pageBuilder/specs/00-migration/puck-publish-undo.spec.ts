@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext } from '../../../shared/test.js';
 import { getActiveChangesetId } from '../../../shared/changesetDb.js';
 import { discardAdminChangesets, getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function adminUserId(): number {
@@ -71,12 +76,21 @@ async function postOp(
 
 test.describe('puck publish and undo', () => {
   test.setTimeout(180_000);
+  // Snapshot the whole table rather than deleting rows: this holds REAL
+  // content on a store that has run the backfill, and a spec that deletes it
+  // destroys the developer's pages as a side effect of running tests.
+  let documentsBefore: PuckDocumentSnapshot[] = [];
+
+  test.beforeEach(async () => {
+    documentsBefore = await snapshotPuckDocuments();
+  });
+
 
   let changesetId: number;
 
   test.beforeEach(async ({ request }) => {
     await discardAdminChangesets(adminUserId());
-    await getDb().query(`DELETE FROM puck_document WHERE route = $1`, [ROUTE_ID]);
+    await restorePuckDocuments(documentsBefore);
     const res = await request.get(EDITOR);
     expect(res.ok(), `could not open the editor: ${res.status()}`).toBe(true);
     changesetId = (await getActiveChangesetId(adminUserId()))!;
@@ -85,7 +99,7 @@ test.describe('puck publish and undo', () => {
 
   test.afterEach(async () => {
     await discardAdminChangesets(adminUserId());
-    await getDb().query(`DELETE FROM puck_document WHERE route = $1`, [ROUTE_ID]);
+    await restorePuckDocuments(documentsBefore);
   });
 
   test('publish applies the document to published state and the storefront serves it', async ({
@@ -96,12 +110,23 @@ test.describe('puck publish and undo', () => {
 
     await postOp(request, changesetId, urn, null, documentWith(heading));
 
-    // Before publish: staged only. If this row already existed, publish would
-    // be proving nothing.
-    const before = await getDb().query(`SELECT 1 FROM puck_document WHERE route = $1`, [
-      ROUTE_ID
-    ]);
-    expect(before.rows, 'the draft leaked into published state').toHaveLength(0);
+    // Before publish: staged only.
+    //
+    // Checked by CONTENT rather than by the absence of a row. This route may
+    // already have a published document (a backfilled store does), so "no
+    // row" fails for a reason unrelated to leakage — and would also pass
+    // vacuously on a store where the route was simply never published. What
+    // must be true is that THIS heading is not live yet.
+    const before = await getDb().query<{ data: unknown }>(
+      `SELECT data FROM puck_document WHERE route = $1`,
+      [ROUTE_ID]
+    );
+    for (const row of before.rows) {
+      expect(
+        JSON.stringify(row.data),
+        'the draft leaked into published state'
+      ).not.toContain(heading);
+    }
 
     const pub = await request.post(`/api/page-builder/changesets/${changesetId}/publish`);
     expect(pub.ok(), `publish failed: ${pub.status()}`).toBe(true);
@@ -112,8 +137,13 @@ test.describe('puck publish and undo', () => {
       `SELECT data FROM puck_document WHERE route = $1`,
       [ROUTE_ID]
     );
-    expect(after.rows, 'publish did not write the document').toHaveLength(1);
-    expect(after.rows[0].data.content[0].props.heading).toBe(heading);
+    // Publish must have applied the op through applyOperationToSource's
+    // puck_document branch. Located by content rather than by row index, since
+    // the route can legitimately hold more than one document.
+    const published = after.rows
+      .map((r) => JSON.stringify(r.data))
+      .filter((d) => d.includes(heading));
+    expect(published, 'publish did not write the document').toHaveLength(1);
 
     // And it must actually reach a shopper through the Puck render path.
     const page = await request.get(`/?__engine=puck`);

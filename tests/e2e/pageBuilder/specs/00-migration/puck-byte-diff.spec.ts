@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '../../../shared/test.js';
 import { getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 // The real converter, exercised rather than reimplemented — a hand-written
 // expected document would only prove the test agrees with itself.
 import { backfillPuckDocuments } from '../../../../../packages/evershop/dist/lib/puck/convert/backfillPuckDocuments.js';
@@ -264,14 +269,7 @@ test.describe('puck byte-diff: widget pipeline vs Puck pipeline', () => {
         await db.query(`DELETE FROM widget_instance WHERE name LIKE $1`, [
           `${marker}-%`
         ]);
-        await db.query(`DELETE FROM puck_document`);
-        for (const doc of documentsBefore) {
-          await db.query(
-            `INSERT INTO puck_document (route, scope_urn, theme, data)
-             VALUES ($1, $2, $3, $4)`,
-            [doc.route, doc.scope_urn, doc.theme, doc.data]
-          );
-        }
+        await restorePuckDocuments(documentsBefore);
       }
     });
   }

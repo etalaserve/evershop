@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '../../../shared/test.js';
 import { getActiveChangesetId } from '../../../shared/changesetDb.js';
 import { discardAdminChangesets, getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** The throwaway admin globalSetup created and this project is signed in as. */
@@ -66,9 +71,17 @@ test.describe('puck editor', () => {
   // simply below the floor here.
   test.setTimeout(240_000);
 
+  // This route may hold a REAL document on a backfilled store; deleting it
+  // would destroy the developer's content as a side effect of running tests.
+  let documentsBefore: PuckDocumentSnapshot[] = [];
+
+  test.beforeEach(async () => {
+    documentsBefore = await snapshotPuckDocuments();
+  });
+
   test.afterEach(async () => {
     await discardAdminChangesets(adminUserId());
-    await getDb().query(`DELETE FROM puck_document WHERE route = $1`, [ROUTE_ID]);
+    await restorePuckDocuments(documentsBefore);
   });
 
   test('mounts with the generated config', async ({ page }) => {
@@ -151,10 +164,19 @@ test.describe('puck editor', () => {
 
     // ...and published state must be untouched. A draft that has reached
     // `puck_document` would already be live on the storefront.
-    const { rows: published } = await db.query(
-      `SELECT 1 FROM puck_document WHERE route = $1`,
+    //
+    // Checked by content rather than row count: the route may legitimately
+    // have a published document already, so its absence is not the property
+    // under test — the staged heading not being in it is.
+    const { rows: published } = await db.query<{ data: unknown }>(
+      `SELECT data FROM puck_document WHERE route = $1`,
       [ROUTE_ID]
     );
-    expect(published, 'a staged edit leaked into published state').toHaveLength(0);
+    for (const row of published) {
+      expect(
+        JSON.stringify(row.data),
+        'a staged edit leaked into published state'
+      ).not.toContain(heading);
+    }
   });
 });

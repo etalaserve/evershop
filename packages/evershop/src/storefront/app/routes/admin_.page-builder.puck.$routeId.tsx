@@ -29,6 +29,7 @@ import { getOrCreateDraft } from '~/lib/page-builder-admin/changeset.js';
 import { buildPuckConfig } from '~/lib/puck/buildPuckConfig.js';
 import { PUCK_CUSTOM_FIELDS } from '~/lib/puck/customFields.js';
 import { loadPuckDocumentForEditing } from '~/lib/puck/loadPuckDocumentForEditing.js';
+import { resolvePuckExtras } from '~/lib/widgets/resolvePuckExtras.js';
 import { useStripInertDevStylesheets } from '~/lib/puck/useStripInertDevStylesheets.js';
 import { buildDocumentSaveOp } from '../../../lib/puck/documentOps.js';
 import {
@@ -63,7 +64,8 @@ import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
  *
  * **Extras are resolved server-side, not by Puck's `resolveData`.** Same
  * reasoning as the render path: `resolveData` is an editor-time hook, not a
- * data layer. The loader resolves them once, and `/admin/page-builder/extras`
+ * data layer. The loader resolves them for the document as loaded, and
+ * `/admin/page-builder/extras`
  * re-resolves after a save so a newly dropped commerce widget fills in without
  * a full revalidation.
  */
@@ -136,6 +138,22 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
     gql<StoreSettingsResponse>(STORE_SETTINGS_QUERY)
   ]);
 
+  /**
+   * Resolve extras for the document as loaded.
+   *
+   * Without this the canvas opens with every data-driven widget empty —
+   * `top_categories`, `latest_products` and the recommendation shelves draw
+   * entirely from `extras`, so an empty map renders them as blank shells and
+   * the merchant sees an apparently broken page until their first save.
+   *
+   * Resolved here rather than fetched on mount so the canvas is correct on
+   * first paint; `/admin/page-builder/extras` then keeps it current for
+   * anything added afterwards.
+   */
+  const extras = await resolvePuckExtras(document.data, buildPuckConfig(), {
+    cookie
+  });
+
   return {
     route: { id: route.id, name: route.name },
     changeset: {
@@ -148,13 +166,21 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
     scopeUrn,
     inRolloutSession: !!sessionToken,
     document,
+    extras,
     themeTokens: resolveThemeTokens(settingsData.setting.themeTokens)
   };
 }
 
 export default function PuckPageBuilder() {
-  const { route, changeset, scopeUrn, inRolloutSession, document, themeTokens } =
-    useLoaderData<typeof loader>();
+  const {
+    route,
+    changeset,
+    scopeUrn,
+    inRolloutSession,
+    document,
+    extras: initialExtras,
+    themeTokens
+  } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   useStripInertDevStylesheets();
 
@@ -164,7 +190,9 @@ export default function PuckPageBuilder() {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [rolloutOpen, setRolloutOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
-  const [extras, setExtras] = useState<Record<string, unknown>>({});
+  // Seeded from the loader so the canvas is populated on first paint, then
+  // refreshed after each save for anything newly added.
+  const [extras, setExtras] = useState<Record<string, unknown>>(initialExtras);
 
   // The config carries the field renderers, so it is editor-only. Rebuilt when
   // the registry could have changed — which is never within one mount, hence
@@ -202,7 +230,7 @@ export default function PuckPageBuilder() {
     previousRef.current = document.exists ? document.data : null;
     uuidRef.current = document.uuid ?? crypto.randomUUID();
     pendingRef.current = null;
-    setExtras({});
+    setExtras(initialExtras);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.id, scopeUrn, changeset.id]);
 

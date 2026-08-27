@@ -71,6 +71,10 @@ export async function loadPuckDocumentForEditing(
     });
   }
 
+  // Which uuids existed BEFORE the overlay, so a document the changeset
+  // introduced can be told apart from the published one below.
+  const storedKeys = new Set(documentMap.keys());
+
   if (changesetToken) {
     const { ops, changesetTheme } = await loadActiveOps({
       previewChangesetToken: changesetToken
@@ -80,20 +84,36 @@ export async function loadPuckDocumentForEditing(
     }
   }
 
-  // The overlay may have INSERTed a document for this route that was not in
-  // the source, or DELETEd the stored one. Pick by (route, scope_urn) rather
-  // than by the stored uuid so both cases resolve correctly.
-  for (const doc of documentMap.values()) {
-    if (doc.route === route && (doc.scope_urn ?? null) === scopeUrn) {
-      return {
-        uuid: doc.uuid,
-        data: (doc.data as PuckDocumentData) ?? EMPTY,
-        // `exists` describes the SOURCE row, not the overlaid result: it
-        // decides INSERT vs UPDATE for the next op, and an op staged in this
-        // same changeset has not created a source row.
-        exists: !!stored && stored.uuid === doc.uuid
-      };
-    }
+  /**
+   * Pick the document to edit.
+   *
+   * The overlay may have INSERTed one for this route that was not in the
+   * source, or DELETEd the stored one, so selection is by
+   * `(route, scope_urn)` rather than by the stored uuid.
+   *
+   * When BOTH exist — a changeset staged a document under a fresh uuid while a
+   * different one is published for the same route — the staged one wins.
+   * Taking the published one instead would show the merchant live content
+   * while their draft sat invisible in the changeset, which is the same
+   * "editing from the wrong baseline" failure the overlay exists to prevent.
+   *
+   * This happens whenever the editor minted a uuid because no row existed at
+   * the time and something published that route afterwards.
+   */
+  const candidates = [...documentMap.values()].filter(
+    (doc) => doc.route === route && (doc.scope_urn ?? null) === scopeUrn
+  );
+  const staged = candidates.filter((doc) => !storedKeys.has(doc.uuid));
+  const chosen = staged[0] ?? candidates[0];
+  if (chosen) {
+    return {
+      uuid: chosen.uuid,
+      data: (chosen.data as PuckDocumentData) ?? EMPTY,
+      // `exists` describes the SOURCE row, not the overlaid result: it decides
+      // INSERT vs UPDATE for the next op, and a document staged in this same
+      // changeset has not created a source row.
+      exists: !!stored && stored.uuid === chosen.uuid
+    };
   }
 
   return { uuid: stored?.uuid ?? null, data: EMPTY, exists: false };

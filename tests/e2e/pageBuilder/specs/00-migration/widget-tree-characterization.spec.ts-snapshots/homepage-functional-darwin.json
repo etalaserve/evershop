@@ -1,5 +1,16 @@
 [
   {
+    "type": "blog_post_hero",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 99,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  },
+  {
     "type": "top_categories",
     "placements": [
       {
@@ -11,11 +22,44 @@
     "columns": []
   },
   {
+    "type": "separator",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 100.5,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  },
+  {
     "type": "latest_products",
     "placements": [
       {
         "area": "content",
-        "sortOrder": 200,
+        "sortOrder": 101,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  },
+  {
+    "type": "related_products",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 176,
+        "scoped": false
+      }
+    ],
+    "columns": []
+  },
+  {
+    "type": "related_products",
+    "placements": [
+      {
+        "area": "content",
+        "sortOrder": 251,
         "scoped": false
       }
     ],

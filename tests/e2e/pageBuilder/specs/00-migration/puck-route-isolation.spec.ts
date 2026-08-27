@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext } from '../../../shared/test.js';
 import { getActiveChangesetId } from '../../../shared/changesetDb.js';
 import { discardAdminChangesets, getDb } from '../../../shared/db.js';
+import {
+  restorePuckDocuments,
+  snapshotPuckDocuments,
+  type PuckDocumentSnapshot
+} from '../../../shared/puckDocuments.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function adminUserId(): number {
@@ -26,6 +31,16 @@ function adminUserId(): number {
  * wrong and pressing Undo on the homepage silently reverts unrelated work on
  * the cart, which the merchant will not discover until they publish.
  */
+
+/**
+ * The second route this test edits.
+ *
+ * Deliberately NOT `cart`: that route requires `cart_summary`, so staging a
+ * plain content document there is refused 400 by the route guarantee — which
+ * would fail this test for a reason that has nothing to do with cursor
+ * isolation. `blogHome` carries no required components.
+ */
+const SECOND_ROUTE = 'blogHome';
 
 function editorUrl(routeId: string) {
   return `/admin/page-builder/puck/${routeId}`;
@@ -66,10 +81,19 @@ async function stage(
 
 test.describe('per-route isolation and palette', () => {
   test.setTimeout(240_000);
+  // Snapshot the whole table rather than deleting rows: this holds REAL
+  // content on a store that has run the backfill, and a spec that deletes it
+  // destroys the developer's pages as a side effect of running tests.
+  let documentsBefore: PuckDocumentSnapshot[] = [];
+
+  test.beforeEach(async () => {
+    documentsBefore = await snapshotPuckDocuments();
+  });
+
 
   test.afterEach(async () => {
     await discardAdminChangesets(adminUserId());
-    await getDb().query(`DELETE FROM puck_document WHERE route IN ('homepage','cart')`);
+    await restorePuckDocuments(documentsBefore);
   });
 
   test('undo on one route leaves another route untouched', async ({ request }) => {
@@ -79,11 +103,11 @@ test.describe('per-route isolation and palette', () => {
     expect(changesetId).not.toBeNull();
 
     await stage(request, changesetId, 'homepage', 'home-edit');
-    await stage(request, changesetId, 'cart', 'cart-edit');
+    await stage(request, changesetId, SECOND_ROUTE, 'other-edit');
 
     // Both routes show their own edit.
     expect(await (await request.get(editorUrl('homepage'))).text()).toContain('home-edit');
-    expect(await (await request.get(editorUrl('cart'))).text()).toContain('cart-edit');
+    expect(await (await request.get(editorUrl(SECOND_ROUTE))).text()).toContain('other-edit');
 
     const undo = await request.post(
       `/api/page-builder/changesets/${changesetId}/move-current`,
@@ -98,16 +122,16 @@ test.describe('per-route isolation and palette', () => {
     // undo implemented as "step back one op" rather than "step back one op ON
     // THIS ROUTE" would silently revert the cart here.
     expect(
-      await (await request.get(editorUrl('cart'))).text(),
+      await (await request.get(editorUrl(SECOND_ROUTE))).text(),
       'undo on homepage reverted work on another route'
-    ).toContain('cart-edit');
+    ).toContain('other-edit');
 
     // The cursor map itself must show only homepage moved.
     const { rows } = await getDb().query<{ route_cursors: Record<string, number> }>(
       `SELECT route_cursors FROM changeset WHERE changeset_id = $1`,
       [changesetId]
     );
-    expect(rows[0].route_cursors.cart).toBeGreaterThan(0);
+    expect(rows[0].route_cursors[SECOND_ROUTE]).toBeGreaterThan(0);
   });
 
   test('the palette offers every registered widget type', async ({ page }) => {
