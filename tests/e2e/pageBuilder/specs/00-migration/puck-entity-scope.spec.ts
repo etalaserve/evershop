@@ -36,7 +36,7 @@ const ROUTE_ID = 'landingPageView';
 const SCOPE_URN = `urn:evershop:promotion:landing_page:${randomUUID()}`;
 
 function editorUrl(entity?: string) {
-  const base = `/admin/page-builder/puck/${ROUTE_ID}`;
+  const base = `/admin/page-builder/edit/${ROUTE_ID}`;
   return entity ? `${base}?entity=${encodeURIComponent(entity)}` : base;
 }
 

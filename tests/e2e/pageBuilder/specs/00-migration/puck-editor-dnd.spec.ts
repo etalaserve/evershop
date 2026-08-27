@@ -32,7 +32,7 @@ function adminUserId(): number {
  */
 
 const ROUTE_ID = 'homepage';
-const EDITOR = `/admin/page-builder/puck/${ROUTE_ID}`;
+const EDITOR = `/admin/page-builder/edit/${ROUTE_ID}`;
 
 /** Wait until Puck's canvas iframe has mounted and taken its styles. */
 async function waitForCanvas(page: Page): Promise<void> {

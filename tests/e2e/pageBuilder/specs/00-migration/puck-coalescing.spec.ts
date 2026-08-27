@@ -89,7 +89,7 @@ test.describe('changeset op coalescing', () => {
     await discardAdminChangesets(adminUserId());
     // Let the editor's own loader create the draft — a plain GET runs
     // getOrCreateDraft without paying for the editor's client bundle.
-    const res = await request.get(`/admin/page-builder/puck/${ROUTE_ID}`);
+    const res = await request.get(`/admin/page-builder/edit/${ROUTE_ID}`);
     expect(res.ok(), `could not open the editor: ${res.status()}`).toBe(true);
     changesetId = (await getActiveChangesetId(adminUserId()))!;
     expect(changesetId, 'the editor did not create a draft changeset').not.toBeNull();

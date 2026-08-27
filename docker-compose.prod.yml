@@ -1,0 +1,86 @@
+# Production-shaped local run of THIS fork.
+#
+# `docker-compose.yml` pulls `evershop/evershop:latest` — stock upstream — so it
+# exercises none of this repository's code. This file builds from the root
+# Dockerfile instead, which is the only way to test what actually ships: the
+# compiled bundle, migrations-on-boot, and the real runtime configuration.
+#
+# Isolated volumes and its own database on purpose: the dev server's postgres
+# holds real work, and a production container runs migrations on boot.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f app
+#
+# The container exits 0 on a config or migration failure (see bin/lib/startUp.js),
+# so read the logs — a broken container looks like a clean shutdown.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: evershop-fork:local
+    restart: unless-stopped
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_SSLMODE: disable
+      REDIS_URL: redis://redis:6379
+      # Must match the published port, or every absolute link points at :3000.
+      # `assertValidHomeUrlEnv()` throws at boot if this is not a valid URL.
+      EVERSHOP_HOME_URL: http://localhost:3100
+      # These five throw when read if unset — admin login, token refresh and
+      # guest order tracking all fail at request time rather than at boot.
+      JWT_ADMIN_SECRET: local-dev-admin-secret-not-for-production
+      JWT_ADMIN_REFRESH_SECRET: local-dev-admin-refresh-not-for-production
+      JWT_CUSTOMER_SECRET: local-dev-customer-secret-not-for-production
+      JWT_CUSTOMER_REFRESH_SECRET: local-dev-customer-refresh-not-for-production
+      ORDER_TRACKING_TOKEN_SECRET: local-dev-order-tracking-not-for-production
+      # The session cookie secret lives in node-config, not an env var. Without
+      # this the image falls back to the literal string "keyboard cat", because
+      # it ships no config/ directory to override the default.
+      NODE_CONFIG: '{"system":{"session":{"cookieSecret":"local-dev-session-secret-not-for-production"}}}'
+    ports:
+      - '3100:3000'
+    volumes:
+      - media-data:/app/media
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "node -e \"fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # The image ships prebuilt, so boot is migrations + listen, not a build.
+      start_period: 45s
+
+  database:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - prod-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+volumes:
+  prod-postgres-data:
+  media-data:

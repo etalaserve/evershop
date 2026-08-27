@@ -35,7 +35,7 @@ function adminUserId(): number {
  */
 
 const ROUTE_ID = 'homepage';
-const EDITOR = `/admin/page-builder/puck/${ROUTE_ID}`;
+const EDITOR = `/admin/page-builder/edit/${ROUTE_ID}`;
 
 /** Coalescing merges same-document writes inside this window; tests that need two ops must clear it. */
 const COALESCE_WINDOW_MS = 15_000;

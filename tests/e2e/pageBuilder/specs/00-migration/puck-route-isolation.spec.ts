@@ -43,7 +43,7 @@ function adminUserId(): number {
 const SECOND_ROUTE = 'blogHome';
 
 function editorUrl(routeId: string) {
-  return `/admin/page-builder/puck/${routeId}`;
+  return `/admin/page-builder/edit/${routeId}`;
 }
 
 async function stage(

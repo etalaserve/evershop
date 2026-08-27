@@ -67,7 +67,10 @@ test.describe('site-wide content', () => {
         data: {
           content: Array<{ type: string; props: { before: unknown[]; after: unknown[] } }>;
         };
-      }>(`SELECT data FROM puck_document WHERE route = 'all'`);
+        // Scoped to the ACTIVE theme's document. Theme e2e specs install
+        // themed content of their own, so an unqualified `route = 'all'`
+        // query picks up every test theme's globals as well as this one.
+      }>(`SELECT data FROM puck_document WHERE route = 'all' AND theme IS NULL`);
       expect(rows, 'no globals document was written').toHaveLength(1);
 
       const [container] = rows[0].data.content;
@@ -123,7 +126,7 @@ test.describe('site-wide content', () => {
     expect(await (await request.get('/?__engine=puck')).text()).toContain(heading);
 
     // ...and the editor for that same route does not.
-    const editor = await request.get('/admin/page-builder/puck/homepage');
+    const editor = await request.get('/admin/page-builder/edit/homepage');
     expect(editor.ok()).toBe(true);
     expect(
       await editor.text(),

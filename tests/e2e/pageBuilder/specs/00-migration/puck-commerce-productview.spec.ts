@@ -89,7 +89,7 @@ test.describe('productView commerce furniture', () => {
     // `permissions: { delete: false }` is a UI affordance and this is
     // reachable directly.
     await discardAdminChangesets(adminUserId());
-    expect((await request.get(`/admin/page-builder/puck/${ROUTE_ID}`)).ok()).toBe(true);
+    expect((await request.get(`/admin/page-builder/edit/${ROUTE_ID}`)).ok()).toBe(true);
     const changesetId = (await getActiveChangesetId(adminUserId()))!;
 
     const without = await postDocument(request, changesetId, [
@@ -124,7 +124,7 @@ test.describe('productView commerce furniture', () => {
     test.skip(!product, 'no active product in this store');
 
     await discardAdminChangesets(adminUserId());
-    expect((await request.get(`/admin/page-builder/puck/${ROUTE_ID}`)).ok()).toBe(true);
+    expect((await request.get(`/admin/page-builder/edit/${ROUTE_ID}`)).ok()).toBe(true);
     const changesetId = (await getActiveChangesetId(adminUserId()))!;
 
     expect(

@@ -42,7 +42,7 @@ function adminUserId(): number {
  */
 
 const ROUTE_ID = 'homepage';
-const EDITOR = `/admin/page-builder/puck/${ROUTE_ID}`;
+const EDITOR = `/admin/page-builder/edit/${ROUTE_ID}`;
 
 /** A minimal valid Puck document holding one identifiable widget. */
 function documentWith(heading: string) {

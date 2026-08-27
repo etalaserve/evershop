@@ -69,6 +69,10 @@ export async function purgeThemeContent(
   await db.query(`DELETE FROM rollout_plan WHERE theme = $1`, [themeId]);
   await db.query(`DELETE FROM changeset WHERE theme = $1`, [themeId]);
   await db.query(`DELETE FROM widget_instance WHERE theme = $1`, [themeId]);
+  // Schema-2 theme content. `installTheme` writes documents alongside widget
+  // rows, so a fixture that cleaned only the latter left a document per test
+  // theme behind — they accumulated until an unrelated spec tripped over them.
+  await db.query(`DELETE FROM puck_document WHERE theme = $1`, [themeId]);
   await db.query(`DELETE FROM theme_install_state WHERE theme = $1`, [themeId]);
   await db.query(`DELETE FROM theme_install_log WHERE theme = $1`, [themeId]);
 }
