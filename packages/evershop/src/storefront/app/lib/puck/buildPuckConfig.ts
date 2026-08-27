@@ -51,7 +51,10 @@ const CONTAINER_SLOTS: Record<string, number | string[]> = {
   // branched on that and mounted its widget area twice; a document cannot
   // branch, so the two states become named slots of one component. Both are
   // rendered in the editor so a merchant can compose either.
-  cart_switch: ['whenEmpty', 'whenFilled']
+  cart_switch: ['whenEmpty', 'whenFilled'],
+  // Site-wide content: one region above every page, one below. Named because
+  // "before" and "after" carry meaning that col0/col1 could not.
+  global_regions: ['before', 'after']
 };
 
 export interface BuildConfigOptions {

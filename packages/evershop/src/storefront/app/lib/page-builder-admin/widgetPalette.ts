@@ -187,7 +187,11 @@ export const WIDGET_PALETTE: PaletteEntry[] = [
   { type: 'blog_post_header', variantId: 'blog_post_header:default', label: 'Post title and byline', category: 'content', defaultSettings: {} },
   { type: 'blog_post_hero', variantId: 'blog_post_hero:default', label: 'Post hero image', category: 'content', defaultSettings: {} },
   { type: 'blog_post_body', variantId: 'blog_post_body:default', label: 'Post body', category: 'content', defaultSettings: {} },
-  { type: 'account_profile', variantId: 'account_profile:default', label: 'Customer profile', category: 'commerce', defaultSettings: {} }
+  { type: 'account_profile', variantId: 'account_profile:default', label: 'Customer profile', category: 'commerce', defaultSettings: {} },
+
+  // Site-wide content. Placed only in the `all` document; the route picker
+  // surfaces it as "Global (all pages)".
+  { type: 'global_regions', variantId: 'global_regions:default', label: 'Global regions', category: 'layout', defaultSettings: {} }
 ];
 
 export function paletteEntry(variantId: string): PaletteEntry | undefined {

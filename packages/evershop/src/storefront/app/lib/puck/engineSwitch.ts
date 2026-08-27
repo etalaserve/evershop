@@ -9,6 +9,13 @@ import type {
   PuckMetadata
 } from '~/lib/puck/metadata.js';
 import type { PuckDocumentData } from '~/lib/puck/loadPuckDocument.js';
+import { mergeGlobalsIntoRoute } from '../../../../lib/puck/mergeGlobals.js';
+
+/** The synthetic route id whose document holds site-wide content. */
+export const GLOBAL_ROUTE = 'all';
+
+/** Used when only globals exist, so a route with no document of its own still shows them. */
+const EMPTY_DOCUMENT: PuckDocumentData = { content: [], root: { props: {} } };
 
 /**
  * TEMPORARY Puck-migration scaffolding — deleted at cutover.
@@ -57,10 +64,27 @@ export async function loadPuckForRequest(
   const url = new URL(request.url);
   if (url.searchParams.get('__engine') !== 'puck') return null;
 
-  const stored = await loadPuckDocument(routeId, opts.scopeUrn ?? null);
-  if (!stored) return null;
+  /**
+   * The route's own document and the site-wide one, in parallel.
+   *
+   * Globals live in a document with `route = 'all'` and are spliced around the
+   * route's content here — on the RENDER path only. The editing path
+   * (`loadPuckDocumentForEditing`) deliberately does not merge: if it did, a
+   * merchant editing `homepage` would save the site-wide content into the
+   * homepage document, silently copying globals into one page and then
+   * diverging from them.
+   */
+  const [stored, globals] = await Promise.all([
+    loadPuckDocument(routeId, opts.scopeUrn ?? null),
+    loadPuckDocument(GLOBAL_ROUTE, null)
+  ]);
 
-  return prepareDocumentForRender(stored, {
+  // Nothing to render at all — no route document and no globals.
+  if (!stored && !globals) return null;
+
+  const merged = mergeGlobalsIntoRoute(stored ?? EMPTY_DOCUMENT, globals);
+
+  return prepareDocumentForRender(merged, {
     routeId,
     cookie: request.headers.get('Cookie'),
     product: opts.product,

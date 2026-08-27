@@ -91,6 +91,11 @@ export function normalize(html: string): string {
     .replace(/\sdata-evershop-area-id="[^"]*"/g, '')
     // Asset hashes change on every build and say nothing about content.
     .replace(/(\/storefront-assets\/[^"']*?)-[A-Za-z0-9_-]{8,}\.(js|css)/g, '$1.$2')
+    // React Router's dev manifest version is regenerated on every dev-server
+    // boot. Purely bookkeeping, and absent from a production build entirely —
+    // without this the goldens fail after any restart, which would train
+    // everyone to re-record them and destroy their value.
+    .replace(/"version":\s*"[0-9.]+"/g, '"version":"<normalized>"')
     .replace(/>\s+</g, '><')
     .trim();
 

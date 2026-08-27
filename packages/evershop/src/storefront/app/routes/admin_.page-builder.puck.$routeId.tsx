@@ -28,6 +28,7 @@ import { pageBuilderApi } from '~/lib/page-builder-admin/api.js';
 import { getOrCreateDraft } from '~/lib/page-builder-admin/changeset.js';
 import { buildPuckConfig } from '~/lib/puck/buildPuckConfig.js';
 import { PUCK_CUSTOM_FIELDS } from '~/lib/puck/customFields.js';
+import { GLOBAL_ROUTE } from '~/lib/puck/engineSwitch.js';
 import { loadPuckDocumentForEditing } from '~/lib/puck/loadPuckDocumentForEditing.js';
 import { resolvePuckExtras } from '~/lib/widgets/resolvePuckExtras.js';
 import { useStripInertDevStylesheets } from '~/lib/puck/useStripInertDevStylesheets.js';
@@ -78,8 +79,27 @@ export async function loader({ params, request, context }: LoaderFunctionArgs) {
   if (!user) throw redirect('/admin/login');
 
   const cookie = request.headers.get('Cookie');
-  const { route } = await gqlAdmin<RouteResponse>(ROUTE_QUERY, { id: routeId }, cookie);
-  if (!route || route.isApi || route.isAdmin || !route.editableInPageBuilder) {
+
+  /**
+   * `all` is a synthetic route: site-wide content that the render path splices
+   * around every page. It has no `route.json`, so the real-route lookup below
+   * would 404 it. Short-circuited rather than registered as a route, because a
+   * registered `all` route would also become addressable on the storefront and
+   * appear in every route picker in the admin.
+   */
+  const isGlobalRoute = routeId === GLOBAL_ROUTE;
+
+  const route = isGlobalRoute
+    ? { id: GLOBAL_ROUTE, name: 'Global (all pages)' }
+    : (await gqlAdmin<RouteResponse>(ROUTE_QUERY, { id: routeId }, cookie)).route;
+
+  if (
+    !route ||
+    (!isGlobalRoute &&
+      ((route as RouteResponse['route']).isApi ||
+        (route as RouteResponse['route']).isAdmin ||
+        !(route as RouteResponse['route']).editableInPageBuilder))
+  ) {
     throw data('This route is not open for page-builder editing', { status: 404 });
   }
 

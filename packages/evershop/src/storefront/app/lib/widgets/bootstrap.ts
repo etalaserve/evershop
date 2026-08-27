@@ -1,3 +1,4 @@
+import { GlobalRegions } from '~/components/widgets/GlobalRegions.js';
 import { AccountProfile } from '~/components/widgets/commerce/AccountProfile.js';
 import { BlogPostBody } from '~/components/widgets/commerce/BlogPostBody.js';
 import { BlogPostHeader } from '~/components/widgets/commerce/BlogPostHeader.js';
@@ -120,3 +121,10 @@ registerStorefrontWidget('blog_post_body', BlogPostBody);
 
 // Account furniture.
 registerStorefrontWidget('account_profile', AccountProfile);
+
+/**
+ * Site-wide content. Only ever placed in the synthetic `all` document; the
+ * render path splits its slots out and splices them around each route's own
+ * content rather than rendering the container itself.
+ */
+registerStorefrontWidget('global_regions', GlobalRegions);
