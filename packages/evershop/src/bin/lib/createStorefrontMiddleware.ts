@@ -135,6 +135,11 @@ const MIGRATED_PATHS: RegExp[] = [
   /^\/robots\.txt$/,
   /^\/sitemap\.xml$/,
   /^\/cart$/,
+  /**
+   * The money path. `/checkout/*` rather than `/checkout$` so a payment
+   * provider's return URL and any future sub-step reach the same app.
+   */
+  /^\/checkout(\/.*)?$/,
   /^\/login$/,
   /^\/register$/,
   /^\/account(\/.*)?$/,

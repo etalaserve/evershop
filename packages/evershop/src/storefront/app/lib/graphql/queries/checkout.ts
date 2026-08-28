@@ -1,6 +1,20 @@
+/**
+ * The checkout cart, resolved from the visitor's session.
+ *
+ * `myCart` rather than `cart(id:)`: this storefront no longer invents a cart
+ * identifier of its own. The cart belongs to EverShop's `sid` session cookie,
+ * which is same-origin and already sent with every request — so a cart id
+ * would have to come from somewhere, and the `cart_id` cookie this route used
+ * to read stopped being written when add-to-cart moved to the session. The
+ * result was a checkout that redirected every shopper back to their cart.
+ *
+ * The server-side caller must forward the request's `Cookie` header;
+ * graphql-request does not do it on its own. Every other session-backed route
+ * here does the same (see `cart.tsx`).
+ */
 export const CHECKOUT_CART_QUERY = /* GraphQL */ `
-  query CheckoutCart($id: String!) {
-    cart(id: $id) {
+  query CheckoutCart {
+    myCart {
       uuid
       totalQty
       subTotal {
@@ -41,7 +55,7 @@ export const CHECKOUT_CART_QUERY = /* GraphQL */ `
 `;
 
 export interface CheckoutCartResponse {
-  cart: {
+  myCart: {
     uuid: string;
     totalQty: number;
     subTotal: { value: number; text: string };

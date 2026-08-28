@@ -7,7 +7,7 @@ import { Button } from '~/components/ui/button.js';
 import { Input } from '~/components/ui/input.js';
 import { Separator } from '~/components/ui/separator.js';
 import { checkout, type CheckoutAddress, type CheckoutPayload } from '~/lib/cart/client.js';
-import { clearCartIdClient, getCartIdFromRequest } from '~/lib/cart/session.js';
+import { clearCartIdClient } from '~/lib/cart/session.js';
 import { gql } from '~/lib/graphql/client.js';
 import { gqlClient } from '~/lib/graphql/client-side.js';
 import {
@@ -27,18 +27,24 @@ import { buildMeta } from '~/lib/seo.js';
 export const meta: MetaFunction = () => buildMeta({ title: 'Checkout', noindex: true });
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const cartId = getCartIdFromRequest(request);
-  if (!cartId) {
-    throw redirect('/cart');
-  }
-  const [{ cart, setting }, { countries }] = await Promise.all([
-    gql<CheckoutCartResponse>(CHECKOUT_CART_QUERY, { id: cartId }),
+  // The cart comes from the `sid` session, like every other cart-aware route.
+  // graphql-request does not forward the browser's cookies for a server-side
+  // call, so the header is passed explicitly.
+  const cookie = request.headers.get('Cookie');
+  const [{ myCart: cart, setting }, { countries }] = await Promise.all([
+    gql<CheckoutCartResponse>(
+      CHECKOUT_CART_QUERY,
+      undefined,
+      cookie ? { Cookie: cookie } : undefined
+    ),
     gql<CountriesResponse>(COUNTRIES_QUERY)
   ]);
   if (!cart || !cart.items || cart.items.length === 0) {
     throw redirect('/cart');
   }
-  return { cartId, cart, setting, countries };
+  // The checkout POST is addressed by cart uuid; the cart itself is the
+  // session's, so this is derived rather than carried in a cookie.
+  return { cartId: cart.uuid, cart, setting, countries };
 }
 
 interface ShippingMethodOption {
