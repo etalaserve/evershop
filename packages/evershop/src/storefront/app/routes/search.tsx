@@ -28,7 +28,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const extras = await resolveWidgetExtras(widgets, cookie);
 
   if (!keyword) {
-    // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
     const puck = await loadPuckForRequest(request, ROUTE_ID, {
       listing: { title: 'Search', subtitle: null, products: [], total: 0 }
     });
@@ -41,9 +40,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // a product's stock/price changes and a shopper searched a common term).
   const result = await gql<SearchResponse>(SEARCH_QUERY, { keyword, page });
 
-  // This branch previously returned no `puck` at all, so `?__engine=puck`
-  // silently fell back to the widget pipeline for every actual search — the
-  // one case the route exists to serve.
+  // This branch previously returned no `puck` at all, silently falling back
+  // to the widget pipeline for every actual search — the one case the route
+  // exists to serve.
   const puck = await loadPuckForRequest(request, ROUTE_ID, {
     listing: {
       title: `Results for "${keyword}"`,

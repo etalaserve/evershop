@@ -25,23 +25,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
   /**
-   * TEMPORARY: `?__engine=puck` renders this route through Puck instead.
-   *
-   * The customer normally reaches this page through the parent layout's outlet
-   * context, which a loader cannot read — so under Puck it has to be fetched
-   * here. Guarded on the engine flag rather than fetched unconditionally: on
-   * the ordinary path the layout has already loaded it, and a second identical
-   * query per account page view would be pure waste.
+   * The customer normally reaches this page through the parent layout's
+   * outlet context, which a loader cannot read — so Puck's `page.customer`
+   * needs its own fetch here, unconditionally, since Puck always renders
+   * this route now. A second identical query per account page view is the
+   * accepted cost (same one `account.tsx`'s own loader already pays).
    */
-  const wantsPuck = new URL(request.url).searchParams.get('__engine') === 'puck';
-  const customer = wantsPuck
-    ? (await gql<CurrentCustomerResponse>(
-        CURRENT_CUSTOMER_QUERY,
-        {},
-        cookie ? { Cookie: cookie } : undefined
-      ))
-        .currentCustomer
-    : null;
+  const customer = (
+    await gql<CurrentCustomerResponse>(
+      CURRENT_CUSTOMER_QUERY,
+      {},
+      cookie ? { Cookie: cookie } : undefined
+    )
+  ).currentCustomer;
   const puck = await loadPuckForRequest(request, ROUTE_ID, {
     ...(customer ? { customer: { customer } } : {})
   });

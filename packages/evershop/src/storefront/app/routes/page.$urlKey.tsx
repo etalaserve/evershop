@@ -35,7 +35,8 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
 
-  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+  // Renders from `puck_document`; falls back to the widget pipeline only
+  // when the route has neither its own document nor any globals.
   const puck = await loadPuckForRequest(request, ROUTE_ID);
 
   return {
@@ -60,8 +61,7 @@ export default function CmsPage() {
     <article className="mx-auto max-w-2xl space-y-6 px-4 py-8">
       <h1 className="text-3xl font-semibold">{page.name}</h1>
       <RichContent rows={page.content as any} />
-      {/* See the loader: `?__engine=puck` is temporary migration scaffolding.
-          Falls back to the widget pipeline when no document exists. */}
+      {/* Falls back to the widget pipeline only when no document exists. */}
       {puck ? (
         <PuckArea data={puck.data} metadata={puck.metadata} />
       ) : (

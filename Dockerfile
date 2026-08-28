@@ -28,6 +28,13 @@ WORKDIR /app
 # there is no .git directory — which .dockerignore deliberately excludes.
 ENV HUSKY=0
 
+# `cypress` (a devDependency) downloads a ~150MB platform binary from
+# download.cypress.io as an `npm install` postinstall step. It is not
+# actually used anywhere in this repo's test tooling (Playwright is), and
+# a build environment without egress to that host — this one included —
+# fails `npm install` entirely over an unrelated, unused package. Skip it.
+ENV CYPRESS_INSTALL_BINARY=0
+
 COPY . .
 
 # Project directories that are not tracked in git but that the app expects to

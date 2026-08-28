@@ -38,7 +38,8 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const widgets = widgetData.widgetsForRoute;
   const extras = await resolveWidgetExtras(widgets, cookie);
 
-  // TEMPORARY: `?__engine=puck` renders this route through Puck instead.
+  // Renders from `puck_document`; falls back to the widget pipeline only
+  // when the route has neither its own document nor any globals.
 
   const puck = await loadPuckForRequest(request, ROUTE_ID, {
     // Category and search share one listing context, so one pair of
