@@ -157,8 +157,18 @@ const MIGRATED_PATHS: RegExp[] = [
  * reaching the real route (the page-builder editor's login-form probe that
  * surfaced this: `POST /admin/login.data` 404'd even though `/admin/login`
  * itself worked fine).
+ *
+ * `/` is the one path this generic rule gets wrong. React Router's own
+ * `getNormalizedPath` (`node_modules/react-router/.../urls.ts`) special-cases
+ * the ROOT route's data request as the literal path `/_root.data`, not
+ * `/.data` — stripping `.data` from it yields `/_root`, which matches no
+ * pattern below and fell through to the legacy pipeline's 404. That 404
+ * response is what the client router loaded as "data for `/`" on every
+ * client-side navigation home, which is also why the click on the storefront
+ * title (a `<Link to="/">`) landed on a 404 page instead of navigating.
  */
 export function isMigratedPath(requestPath: string): boolean {
+  if (requestPath === '/_root.data') return isMigratedPath('/');
   const path = requestPath.endsWith('.data') ? requestPath.slice(0, -'.data'.length) : requestPath;
   return MIGRATED_PATHS.some((pattern) => pattern.test(path));
 }
