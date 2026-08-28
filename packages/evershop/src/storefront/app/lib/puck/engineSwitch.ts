@@ -18,26 +18,20 @@ export const GLOBAL_ROUTE = 'all';
 const EMPTY_DOCUMENT: PuckDocumentData = { content: [], root: { props: {} } };
 
 /**
- * TEMPORARY Puck-migration scaffolding — deleted at cutover.
+ * Cut over: every request renders a route's area from `puck_document`
+ * unconditionally — no `?__engine=puck` opt-in any more.
  *
- * `?__engine=puck` renders a route's area from `puck_document` instead of the
- * widget tables, so the same page can be fetched through both pipelines and
- * compared (`tests/e2e/pageBuilder/specs/00-migration/puck-byte-diff.spec.ts`).
+ * **Still falls back to the widget pipeline** when a route has neither its
+ * own document nor any globals (nothing has been backfilled or authored for
+ * it yet), rather than rendering a blank page — see the `null` return below.
+ * That fallback is the only remaining difference from a full removal, kept
+ * deliberately as a safety net for a route nobody has touched in Puck yet;
+ * every route this store actually has content for (`homepage`, `productView`
+ * — see `backfillPuckDocuments`) already renders through Puck.
  *
- * Two properties are deliberate:
- *
- *  - **Opt-in per request, never the default.** Ordinary traffic is untouched
- *    while the migration is in flight.
- *  - **Falls back to the widget pipeline** when no document has been
- *    backfilled for the route, rather than rendering a blank page.
- *
- * This exists as a helper rather than inline in each route so the switch reads
- * as one line per route, and so cutover is a mechanical removal of one call
- * site each instead of unpicking eight-line blocks from nine files.
- *
- * At cutover this collapses into an unconditional load: the `__engine` check
- * and the widget-pipeline fallback both go away, and route loaders call
- * `loadPuckDocument` + `prepareDocumentForRender` directly.
+ * This exists as a helper rather than inline in each route so the switch
+ * reads as one line per route, matching the nine call sites in
+ * `app/routes/*.tsx`.
  */
 export async function loadPuckForRequest(
   request: Request,
@@ -61,9 +55,6 @@ export async function loadPuckForRequest(
     scopeUrn?: string | null;
   } = {}
 ): Promise<{ data: PuckDocumentData; metadata: PuckMetadata } | null> {
-  const url = new URL(request.url);
-  if (url.searchParams.get('__engine') !== 'puck') return null;
-
   /**
    * The route's own document and the site-wide one, in parallel.
    *
