@@ -190,6 +190,29 @@ const ASSET_PATH = /^\/storefront-assets\//;
 const RR_MANIFEST_PATH = /^\/__manifest$/;
 
 /**
+ * Every request shape this middleware will answer: migrated pages, its own
+ * static assets, and its dev-mode manifest fetches. Exported so
+ * `addDefaultMiddlewareFuncs`'s legacy "404 Not Found" handler — which runs
+ * *before* this middleware is mounted, since it can't know a request will be
+ * served two middlewares later — can skip stamping `response.status(404)`
+ * onto a request this middleware is about to serve correctly.
+ *
+ * That stamp matters even though this middleware never checks it:
+ * `express.static`/`send` only default `res.statusCode` to 200 when nothing
+ * upstream set it — an already-404'd response keeps that status while still
+ * streaming the real file body, and a browser refuses to apply a stylesheet
+ * delivered on a 404, which is exactly the "CSS request succeeds but the
+ * page renders unstyled" failure this was found from.
+ */
+export function isStorefrontHandledPath(requestPath: string): boolean {
+  return (
+    isMigratedPath(requestPath) ||
+    ASSET_PATH.test(requestPath) ||
+    RR_MANIFEST_PATH.test(requestPath)
+  );
+}
+
+/**
  * Wires the React Router v7 middleware onto `app`, gated by
  * `isMigratedPath` (plus the asset prefix above, unconditionally). A
  * request that doesn't match falls through (`next()`) to the existing

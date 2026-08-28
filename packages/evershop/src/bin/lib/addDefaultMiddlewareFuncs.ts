@@ -30,6 +30,7 @@ import {
   getStoreLanguage
 } from '../../modules/setting/services/setting.js';
 import { getDevMiddleware, getHotMiddleware } from './devEnvHelper.js';
+import { isStorefrontHandledPath } from './createStorefrontMiddleware.js';
 
 export function addDefaultMiddlewareFuncs(app) {
   app.use((request, response, next) => {
@@ -371,7 +372,14 @@ export function addDefaultMiddlewareFuncs(app) {
   }
   /** 404 Not Found handle */
   app.use((request, response, next) => {
-    if (!request.currentRoute) {
+    // The RRv7 storefront middleware isn't mounted yet at this point in the
+    // chain (see `attachStorefrontMiddleware` in `app.js`), so a request it
+    // will go on to serve — a page, its static assets, its dev manifest
+    // fetch — never matches a legacy route and lands here. Stamping 404 now
+    // would stick: `express.static`/`send` only default the status to 200
+    // when nothing upstream already set it, so the real file would stream
+    // back on a 404 status, which browsers refuse to apply as a stylesheet.
+    if (!request.currentRoute && !isStorefrontHandledPath(request.path)) {
       response.status(404);
       const routes = getRoutes();
       request.currentRoute = routes.find((r) => r.id === 'notFound');
