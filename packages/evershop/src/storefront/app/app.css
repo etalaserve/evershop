@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+/* Ported blocks live outside the paths v4 auto-detects from this file, so
+   their utility classes must be pointed at explicitly or they are never
+   generated — the block renders with its markup intact and no styling. */
+@source '../app/blocks/**/*.{ts,tsx}';
+@source '../app/components/widgets/blocks/**/*.{ts,tsx}';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));

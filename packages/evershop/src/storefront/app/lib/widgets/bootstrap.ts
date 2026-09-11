@@ -11,6 +11,7 @@ import { ListingHeader } from '~/components/widgets/commerce/ListingHeader.js';
 import { ProductAddToCart } from '~/components/widgets/commerce/ProductAddToCart.js';
 import { ProductGallery } from '~/components/widgets/commerce/ProductGallery.js';
 import { ProductPrice } from '~/components/widgets/commerce/ProductPrice.js';
+import { UlAboutBusiness } from '~/components/widgets/blocks/UlAboutBusiness.js';
 import { registerStorefrontWidget } from './registry.js';
 import { AnnouncementBar } from '~/components/widgets/AnnouncementBar.js';
 import { Banner } from '~/components/widgets/Banner.js';
@@ -128,3 +129,11 @@ registerStorefrontWidget('account_profile', AccountProfile);
  * content rather than rendering the container itself.
  */
 registerStorefrontWidget('global_regions', GlobalRegions);
+
+/**
+ * Ported blocks from the block library. Namespaced `block_<registry>_<item>`
+ * so they stay distinguishable from the widgets authored here — and because
+ * this string is persisted in every document that uses one, it can never be
+ * renamed.
+ */
+registerStorefrontWidget('block_ul_about_business', UlAboutBusiness);

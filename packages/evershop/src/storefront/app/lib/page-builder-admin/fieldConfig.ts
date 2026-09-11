@@ -443,5 +443,31 @@ export const WIDGET_FIELD_CONFIGS: Record<string, FieldConfig[]> = {
     { key: 'viewAllLabel', label: '"View all" label', type: 'text' }
   ],
 
-  top_categories: [{ key: 'heading', label: 'Heading', type: 'text' }]
+  top_categories: [{ key: 'heading', label: 'Heading', type: 'text' }],
+
+  // --- ported blocks ---
+  block_ul_about_business: [
+    { key: 'eyebrow', label: 'Eyebrow', type: 'text' },
+    { key: 'heading', label: 'Heading', type: 'textarea' },
+    {
+      key: 'stats', label: 'Stat tiles', type: 'array', itemLabel: 'label',
+      defaultItem: { value: '10+', label: 'Something counted' },
+      itemFields: [
+        { key: 'value', label: 'Value', type: 'text' },
+        { key: 'label', label: 'Label', type: 'text' }
+      ]
+    },
+    { key: 'imageSrc', label: 'Image', type: 'image' },
+    { key: 'imageAlt', label: 'Image alt text', type: 'text' },
+    {
+      key: 'points', label: 'Points', type: 'array', itemLabel: 'title',
+      defaultItem: { title: 'A point', body: 'What it means for the customer.' },
+      itemFields: [
+        { key: 'title', label: 'Title', type: 'text' },
+        { key: 'body', label: 'Body', type: 'textarea' }
+      ]
+    },
+    { key: 'ctaLabel', label: 'CTA label', type: 'text' },
+    { key: 'ctaHref', label: 'CTA link', type: 'text' }
+  ]
 };

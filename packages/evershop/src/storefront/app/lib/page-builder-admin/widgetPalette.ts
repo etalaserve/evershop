@@ -29,6 +29,23 @@ function recommendationShelfSettings(heading: string, limit: number, variant: 'g
   return { heading, limit, variant };
 }
 
+/**
+ * Ported blocks. `defaultSettings` stays empty on purpose — those values are
+ * persisted the moment a widget is dropped, and the block supplies its own
+ * presentable defaults at render time via `withBlockDefaults`.
+ */
+export const BLOCK_PALETTE: PaletteEntry[] = [
+  {
+    type: 'block_ul_about_business',
+    variantId: 'block_ul_about_business:default',
+    // No em dash: paletteDefaults() splits on one to strip a variant suffix,
+    // so "About — Corporate stats" would reach the canvas as just "About".
+    label: 'About with stat tiles',
+    category: 'content',
+    defaultSettings: {}
+  }
+];
+
 export const WIDGET_PALETTE: PaletteEntry[] = [
   // --- layout ---
   { type: 'columns', variantId: 'columns:default', label: 'Columns', category: 'layout', defaultSettings: { columnCount: 2, gap: 16, ratio: '1-1', background: null, padding: 'none', contentPosition: 'mc' } },
@@ -191,7 +208,10 @@ export const WIDGET_PALETTE: PaletteEntry[] = [
 
   // Site-wide content. Placed only in the `all` document; the route picker
   // surfaces it as "Global (all pages)".
-  { type: 'global_regions', variantId: 'global_regions:default', label: 'Global regions', category: 'layout', defaultSettings: {} }
+  { type: 'global_regions', variantId: 'global_regions:default', label: 'Global regions', category: 'layout', defaultSettings: {} },
+
+  // Ported blocks, kept in their own array so the generated set stays separable.
+  ...BLOCK_PALETTE
 ];
 
 export function paletteEntry(variantId: string): PaletteEntry | undefined {
