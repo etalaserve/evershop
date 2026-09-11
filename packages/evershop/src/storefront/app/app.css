@@ -41,6 +41,17 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Ported blocks reach for the upper rungs; without these `rounded-2xl` and
+     friends silently fall back to Tailwind's fixed defaults and stop tracking
+     `--radius`. Extends this file's additive idiom, not the block library's
+     multiplicative one. */
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  /* A seam, not a feature: block text roles carry `font-heading` so a heading
+     font can be split from the body font later without touching every block.
+     Until then it resolves to the body font. */
+  --font-heading: var(--font-sans);
 }
 
 /**

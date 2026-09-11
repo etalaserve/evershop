@@ -18,9 +18,17 @@ export const buttonVariants = cva(
       },
       size: {
         default: 'h-9 px-4 py-2',
+        // Added for ported blocks, which use a denser button scale than the
+        // admin does. Sized to extend THIS ladder (default h-9, sm h-8) rather
+        // than copying the block library's own — the blocks adopt EverShop's
+        // proportions deliberately, so a merchant's theme stays coherent.
+        xs: 'h-7 rounded-md px-2 text-xs',
         sm: 'h-8 rounded-md px-3 text-xs',
         lg: 'h-10 rounded-md px-8',
-        icon: 'h-9 w-9'
+        icon: 'h-9 w-9',
+        'icon-xs': 'h-7 w-7',
+        'icon-sm': 'h-8 w-8',
+        'icon-lg': 'h-10 w-10'
       }
     },
     defaultVariants: {

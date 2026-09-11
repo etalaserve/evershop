@@ -11,7 +11,10 @@ const badgeVariants = cva(
         default: 'border-transparent bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
         destructive: 'border-transparent bg-destructive text-destructive-foreground',
-        outline: 'text-foreground border-border'
+        outline: 'text-foreground border-border',
+        // Added for ported blocks.
+        ghost: 'border-transparent hover:bg-muted hover:text-muted-foreground',
+        link: 'border-transparent text-primary underline-offset-4 hover:underline'
       }
     },
     defaultVariants: { variant: 'default' }

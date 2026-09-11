@@ -23,6 +23,15 @@ export function CardDescription({ className, ...props }: React.ComponentProps<'d
   return <div className={cn('text-sm text-muted-foreground', className)} {...props} />;
 }
 
+/**
+ * Top-right action slot in a CardHeader. Added for ported blocks, which use
+ * shadcn's newer Card anatomy. Positioning assumes a grid header; on this
+ * Card's flex header it simply sits inline, which is the sane fallback.
+ */
+export function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
+  return <div className={cn('ml-auto self-start', className)} {...props} />;
+}
+
 export function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
   return <div className={cn('p-4 pt-0', className)} {...props} />;
 }
